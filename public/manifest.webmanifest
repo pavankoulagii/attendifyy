@@ -1,0 +1,12 @@
+{
+  "name": "Attendify",
+  "short_name": "Attendify",
+  "description": "Never Get Detained Again. Track attendance, calculate bunks, stay above 75%.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0a18",
+  "theme_color": "#0b0a18",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
