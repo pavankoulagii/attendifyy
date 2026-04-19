@@ -14,7 +14,122 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      attendance_logs: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          status: string
+          subject_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          status: string
+          subject_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          status?: string
+          subject_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_logs_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          college: string | null
+          course: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          is_premium: boolean
+          required_attendance: number
+          semester: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          college?: string | null
+          course?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_premium?: boolean
+          required_attendance?: number
+          semester?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          college?: string | null
+          course?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_premium?: boolean
+          required_attendance?: number
+          semester?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      subjects: {
+        Row: {
+          classes_attended: number
+          classes_held: number
+          color: string
+          created_at: string
+          faculty: string | null
+          id: string
+          name: string
+          required_attendance: number
+          updated_at: string
+          user_id: string
+          weekly_schedule: Json
+        }
+        Insert: {
+          classes_attended?: number
+          classes_held?: number
+          color?: string
+          created_at?: string
+          faculty?: string | null
+          id?: string
+          name: string
+          required_attendance?: number
+          updated_at?: string
+          user_id: string
+          weekly_schedule?: Json
+        }
+        Update: {
+          classes_attended?: number
+          classes_held?: number
+          color?: string
+          created_at?: string
+          faculty?: string | null
+          id?: string
+          name?: string
+          required_attendance?: number
+          updated_at?: string
+          user_id?: string
+          weekly_schedule?: Json
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
