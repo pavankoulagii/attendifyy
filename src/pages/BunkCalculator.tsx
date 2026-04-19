@@ -184,7 +184,7 @@ export default function BunkCalculator() {
                 <div className="text-right shrink-0">
                   <div className={cn("text-xs font-bold mb-1",
                     st === "safe" && "text-secondary",
-                    st === "warning" && "text-amber-600",
+                    st === "warning" && "text-warning",
                     st === "critical" && "text-destructive"
                   )}>{p.toFixed(1)}%</div>
                   <div className="w-24 h-2 surface-high rounded-full overflow-hidden">

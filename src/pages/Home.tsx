@@ -80,7 +80,7 @@ export default function Home() {
             <div className={cn(
               "inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-bold tracking-wide",
               status === "safe" && "bg-secondary-container text-secondary-container-foreground",
-              status === "warning" && "bg-amber-100 text-amber-900",
+              status === "warning" && "bg-warning/15 text-warning",
               status === "critical" && "bg-destructive-container text-destructive-container-foreground"
             )}>
               <span className="material-symbols-outlined ms-fill mr-1" style={{ fontSize: 14 }}>
@@ -159,7 +159,7 @@ export default function Home() {
                     <span className={cn(
                       "text-xs font-bold shrink-0 ml-2",
                       st === "safe" && "text-secondary",
-                      st === "warning" && "text-amber-600",
+                      st === "warning" && "text-warning",
                       st === "critical" && "text-destructive"
                     )}>{Math.round(p)}% Att.</span>
                   </div>

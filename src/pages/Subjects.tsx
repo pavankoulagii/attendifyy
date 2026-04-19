@@ -94,7 +94,7 @@ export default function Subjects() {
                         <span className={cn(
                           "text-[10px] font-bold px-2 py-0.5 rounded-full mt-1",
                           st === "safe" && "bg-secondary-container text-secondary-container-foreground",
-                          st === "warning" && "bg-amber-100 text-amber-900",
+                          st === "warning" && "bg-warning/15 text-warning",
                           st === "critical" && "bg-destructive-container text-destructive-container-foreground"
                         )}>
                           {st === "safe" ? "Excellent" : st === "warning" ? "Warning" : "Critical"}
