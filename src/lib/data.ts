@@ -144,7 +144,7 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: async (patch: Record<string, any>) => {
       if (!user) throw new Error("not authed");
-      const { error } = await supabase.from("profiles").update(patch).eq("user_id", user.id);
+      const { error } = await supabase.from("profiles").update(patch as any).eq("user_id", user.id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["profile"] }),
