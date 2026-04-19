@@ -9,7 +9,8 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui'],
-        display: ['"Space Grotesk"', 'Inter', 'sans-serif'],
+        display: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
+        headline: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -21,14 +22,19 @@ export default {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
           glow: "hsl(var(--primary-glow))",
+          container: "hsl(var(--primary-container))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
+          container: "hsl(var(--secondary-container))",
+          'container-foreground': "hsl(var(--secondary-container-foreground))",
         },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
+          container: "hsl(var(--error-container))",
+          'container-foreground': "hsl(var(--error-container-foreground))",
         },
         success: {
           DEFAULT: "hsl(var(--success))",
@@ -42,13 +48,26 @@ export default {
         accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
         popover: { DEFAULT: "hsl(var(--popover))", foreground: "hsl(var(--popover-foreground))" },
         card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
+        surface: {
+          bright: "hsl(var(--surface-bright))",
+          low: "hsl(var(--surface-low))",
+          mid: "hsl(var(--surface-mid))",
+          high: "hsl(var(--surface-high))",
+          highest: "hsl(var(--surface-highest))",
+        },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 4px)",
         sm: "calc(var(--radius) - 8px)",
-        '2xl': "calc(var(--radius) + 4px)",
-        '3xl': "calc(var(--radius) + 12px)",
+        md: "calc(var(--radius) - 4px)",
+        lg: "var(--radius)",
+        xl: "1.375rem",   // 22px — primary card scale
+        '2xl': "1.75rem",
+        '3xl': "2rem",    // large cards
+      },
+      boxShadow: {
+        glow: "var(--shadow-glow)",
+        card: "var(--shadow-card)",
+        soft: "var(--shadow-soft)",
       },
       keyframes: {
         "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },
