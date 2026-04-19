@@ -1,9 +1,23 @@
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
-export function GlassCard({ className, children, ...rest }: { className?: string; children: ReactNode } & React.HTMLAttributes<HTMLDivElement>) {
+export function GlassCard({
+  className,
+  children,
+  variant = "card",
+  ...rest
+}: { className?: string; children: ReactNode; variant?: "card" | "low" | "glass" } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("glass rounded-3xl p-4", className)} {...rest}>
+    <div
+      className={cn(
+        "rounded-xl p-6 shadow-card",
+        variant === "card" && "bg-card",
+        variant === "low" && "surface-low shadow-none",
+        variant === "glass" && "glass",
+        className,
+      )}
+      {...rest}
+    >
       {children}
     </div>
   );
