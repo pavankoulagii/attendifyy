@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMarkAttendance, useSubjects, type Subject } from "@/lib/data";
+import { useClassPeriods, fmtTime } from "@/lib/periods";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { percent, healthStatus } from "@/lib/attendance";
@@ -16,24 +18,46 @@ const DAYS = [
 
 export default function Timetable() {
   const { data: subjects = [] } = useSubjects();
+  const { data: periods = [] } = useClassPeriods();
   const [day, setDay] = useState<number>(new Date().getDay());
   const mark = useMarkAttendance();
 
-  const todays = subjects.filter(
-    (s) => Array.isArray(s.weekly_schedule) && s.weekly_schedule.includes(day),
+  const subjectsById = new Map(subjects.map((s) => [s.id, s]));
+
+  // Periods scheduled for selected day, sorted by start_time
+  const todayPeriods = periods
+    .filter((p) => p.day_of_week === day)
+    .sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+  // Fallback for subjects without periods (legacy weekly_schedule)
+  const fallback = subjects.filter(
+    (s) =>
+      Array.isArray(s.weekly_schedule) &&
+      (s.weekly_schedule as number[]).includes(day) &&
+      !periods.some((p) => p.subject_id === s.id),
   );
+
+  const isEmpty = todayPeriods.length === 0 && fallback.length === 0;
 
   return (
     <main className="px-5 pt-6 pb-8 space-y-6 animate-fade-in">
-      {/* Header */}
-      <header>
-        <h1 className="font-headline font-extrabold text-3xl tracking-tight">Timetable</h1>
-        <p className="text-muted-foreground text-sm font-medium mt-1">
-          Tap a class to mark attendance instantly
-        </p>
+      <header className="flex items-end justify-between">
+        <div>
+          <h1 className="font-headline font-extrabold text-3xl tracking-tight">Timetable</h1>
+          <p className="text-muted-foreground text-sm font-medium mt-1">
+            {todayPeriods.length > 0
+              ? `${todayPeriods.length} class${todayPeriods.length === 1 ? "" : "es"} today`
+              : "Tap a class to mark attendance"}
+          </p>
+        </div>
+        <Link to="/app/subjects/new">
+          <button className="h-11 px-4 rounded-2xl gradient-primary text-white shadow-glow tap-scale flex items-center gap-1.5">
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add_a_photo</span>
+            <span className="text-xs font-headline font-bold">Scan</span>
+          </button>
+        </Link>
       </header>
 
-      {/* Day selector */}
       <section className="grid grid-cols-7 gap-2">
         {DAYS.map((d, i) => {
           const active = day === i;
@@ -55,19 +79,39 @@ export default function Timetable() {
         })}
       </section>
 
-      {/* Class list */}
-      {todays.length === 0 ? (
+      {isEmpty ? (
         <div className="bg-card rounded-xl p-10 text-center shadow-card">
           <div className="text-5xl mb-2">🎉</div>
           <p className="font-headline font-bold text-lg">No classes</p>
           <p className="text-sm text-muted-foreground font-medium">Enjoy your day off!</p>
         </div>
       ) : (
-        <section className="space-y-4">
-          {todays.map((s) => (
-            <ClassCard
+        <section className="space-y-3">
+          {todayPeriods.map((p) => {
+            const subject = subjectsById.get(p.subject_id);
+            if (!subject) return null;
+            return (
+              <PeriodCard
+                key={p.id}
+                subject={subject}
+                start={p.start_time}
+                end={p.end_time}
+                room={p.room}
+                onMark={(st) => {
+                  mark.mutate({ subject, status: st });
+                  toast.success(`${subject.name}: ${st}`);
+                }}
+              />
+            );
+          })}
+
+          {fallback.map((s) => (
+            <PeriodCard
               key={s.id}
               subject={s}
+              start={null}
+              end={null}
+              room={null}
               onMark={(st) => {
                 mark.mutate({ subject: s, status: st });
                 toast.success(`${s.name}: ${st}`);
@@ -80,27 +124,37 @@ export default function Timetable() {
   );
 }
 
-function ClassCard({
-  subject,
-  onMark,
+function PeriodCard({
+  subject, start, end, room, onMark,
 }: {
   subject: Subject;
+  start: string | null;
+  end: string | null;
+  room: string | null;
   onMark: (s: "present" | "absent" | "cancelled") => void;
 }) {
   const p = percent(subject.classes_attended, subject.classes_held);
   const st = healthStatus(p, Number(subject.required_attendance));
+
   return (
-    <div className="bg-card rounded-xl p-5 shadow-card space-y-4">
+    <div className="bg-card rounded-2xl p-5 shadow-card space-y-4">
       <div className="flex items-center gap-4">
         <div
-          className="h-12 w-12 rounded-full grid place-items-center text-white shrink-0 shadow-soft"
+          className="h-12 w-12 rounded-2xl grid place-items-center text-white shrink-0 shadow-soft"
           style={{ background: subject.color }}
         >
           <span className="material-symbols-outlined" style={{ fontSize: 22 }}>menu_book</span>
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-headline font-bold text-base truncate">{subject.name}</p>
-          <p className="text-xs text-muted-foreground font-medium truncate">{subject.faculty || "—"}</p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium truncate">
+            {start && end ? (
+              <span className="truncate">{fmtTime(start)} – {fmtTime(end)}</span>
+            ) : (
+              <span className="truncate">{subject.faculty || "—"}</span>
+            )}
+            {room && <span className="text-[10px] surface-low px-1.5 py-0.5 rounded">{room}</span>}
+          </div>
         </div>
         <span
           className={cn(
