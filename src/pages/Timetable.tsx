@@ -1,77 +1,145 @@
 import { useState } from "react";
 import { useMarkAttendance, useSubjects, type Subject } from "@/lib/data";
-import { GlassCard } from "@/components/GlassCard";
 import { cn } from "@/lib/utils";
-import { Check, X, Ban } from "lucide-react";
 import { toast } from "sonner";
+import { percent, healthStatus } from "@/lib/attendance";
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAYS = [
+  { short: "S", long: "Sun" },
+  { short: "M", long: "Mon" },
+  { short: "T", long: "Tue" },
+  { short: "W", long: "Wed" },
+  { short: "T", long: "Thu" },
+  { short: "F", long: "Fri" },
+  { short: "S", long: "Sat" },
+];
 
 export default function Timetable() {
   const { data: subjects = [] } = useSubjects();
   const [day, setDay] = useState<number>(new Date().getDay());
   const mark = useMarkAttendance();
 
-  const todays = subjects.filter((s) => Array.isArray(s.weekly_schedule) && s.weekly_schedule.includes(day));
+  const todays = subjects.filter(
+    (s) => Array.isArray(s.weekly_schedule) && s.weekly_schedule.includes(day),
+  );
 
   return (
-    <div className="px-5 pt-8 space-y-5 animate-fade-in">
+    <main className="px-5 pt-6 pb-8 space-y-6 animate-fade-in">
+      {/* Header */}
       <header>
-        <h1 className="font-display text-2xl font-bold">Timetable</h1>
-        <p className="text-xs text-muted-foreground">Tap a class to mark attendance</p>
+        <h1 className="font-headline font-extrabold text-3xl tracking-tight">Timetable</h1>
+        <p className="text-muted-foreground text-sm font-medium mt-1">
+          Tap a class to mark attendance instantly
+        </p>
       </header>
 
-      <div className="grid grid-cols-7 gap-1.5">
-        {DAYS.map((d, i) => (
-          <button
-            key={i} onClick={() => setDay(i)}
-            className={cn(
-              "py-3 rounded-2xl text-[11px] font-semibold tap-scale flex flex-col items-center gap-0.5",
-              day === i ? "gradient-primary text-primary-foreground shadow-glow" : "glass text-muted-foreground"
-            )}
-          >
-            <span>{d.slice(0,1)}</span>
-            <span className="text-[9px] opacity-70">{d.slice(1)}</span>
-          </button>
-        ))}
+      {/* Day selector */}
+      <section className="grid grid-cols-7 gap-2">
+        {DAYS.map((d, i) => {
+          const active = day === i;
+          return (
+            <button
+              key={i}
+              onClick={() => setDay(i)}
+              className={cn(
+                "py-3 rounded-2xl flex flex-col items-center gap-0.5 tap-scale transition-all",
+                active
+                  ? "gradient-primary text-white shadow-glow"
+                  : "surface-low text-muted-foreground hover:bg-surface-mid",
+              )}
+            >
+              <span className="font-headline font-bold text-sm">{d.short}</span>
+              <span className="text-[9px] font-bold opacity-80">{d.long.slice(1)}</span>
+            </button>
+          );
+        })}
+      </section>
+
+      {/* Class list */}
+      {todays.length === 0 ? (
+        <div className="bg-card rounded-xl p-10 text-center shadow-card">
+          <div className="text-5xl mb-2">🎉</div>
+          <p className="font-headline font-bold text-lg">No classes</p>
+          <p className="text-sm text-muted-foreground font-medium">Enjoy your day off!</p>
+        </div>
+      ) : (
+        <section className="space-y-4">
+          {todays.map((s) => (
+            <ClassCard
+              key={s.id}
+              subject={s}
+              onMark={(st) => {
+                mark.mutate({ subject: s, status: st });
+                toast.success(`${s.name}: ${st}`);
+              }}
+            />
+          ))}
+        </section>
+      )}
+    </main>
+  );
+}
+
+function ClassCard({
+  subject,
+  onMark,
+}: {
+  subject: Subject;
+  onMark: (s: "present" | "absent" | "cancelled") => void;
+}) {
+  const p = percent(subject.classes_attended, subject.classes_held);
+  const st = healthStatus(p, Number(subject.required_attendance));
+  return (
+    <div className="bg-card rounded-xl p-5 shadow-card space-y-4">
+      <div className="flex items-center gap-4">
+        <div
+          className="h-12 w-12 rounded-full grid place-items-center text-white shrink-0 shadow-soft"
+          style={{ background: subject.color }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 22 }}>menu_book</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-headline font-bold text-base truncate">{subject.name}</p>
+          <p className="text-xs text-muted-foreground font-medium truncate">{subject.faculty || "—"}</p>
+        </div>
+        <span
+          className={cn(
+            "text-sm font-headline font-black shrink-0",
+            st === "safe" && "text-secondary",
+            st === "warning" && "text-warning",
+            st === "critical" && "text-destructive",
+          )}
+        >
+          {Math.round(p)}%
+        </span>
       </div>
 
-      {todays.length === 0 ? (
-        <GlassCard className="text-center py-10">
-          <div className="text-4xl mb-1">🎉</div>
-          <p className="font-semibold">No classes</p>
-          <p className="text-xs text-muted-foreground">Enjoy your day off!</p>
-        </GlassCard>
-      ) : (
-        <div className="space-y-3">
-          {todays.map((s) => <ClassCard key={s.id} subject={s} onMark={(st) => { mark.mutate({ subject: s, status: st }); toast.success(`${s.name}: ${st}`); }} />)}
-        </div>
-      )}
+      <div className="grid grid-cols-3 gap-2.5">
+        <ActionBtn icon="check_circle" label="Present" tone="success" onClick={() => onMark("present")} />
+        <ActionBtn icon="cancel" label="Absent" tone="danger" onClick={() => onMark("absent")} />
+        <ActionBtn icon="event_busy" label="Cancel" tone="muted" onClick={() => onMark("cancelled")} />
+      </div>
     </div>
   );
 }
 
-function ClassCard({ subject, onMark }: { subject: Subject; onMark: (s: "present" | "absent" | "cancelled") => void }) {
+function ActionBtn({
+  icon, label, tone, onClick,
+}: {
+  icon: string; label: string; tone: "success" | "danger" | "muted"; onClick: () => void;
+}) {
   return (
-    <GlassCard className="space-y-3">
-      <div className="flex items-center gap-3">
-        <div className="h-3 w-3 rounded-full" style={{ background: subject.color }} />
-        <div className="flex-1">
-          <p className="font-semibold">{subject.name}</p>
-          <p className="text-xs text-muted-foreground">{subject.faculty || "—"}</p>
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        <button onClick={() => onMark("present")} className="rounded-xl py-3 gradient-success text-primary-foreground flex items-center justify-center gap-1 tap-scale shadow-glow">
-          <Check className="h-4 w-4" /><span className="text-xs font-semibold">Present</span>
-        </button>
-        <button onClick={() => onMark("absent")} className="rounded-xl py-3 gradient-danger text-primary-foreground flex items-center justify-center gap-1 tap-scale shadow-glow">
-          <X className="h-4 w-4" /><span className="text-xs font-semibold">Absent</span>
-        </button>
-        <button onClick={() => onMark("cancelled")} className="rounded-xl py-3 gradient-warning text-warning-foreground flex items-center justify-center gap-1 tap-scale shadow-glow">
-          <Ban className="h-4 w-4" /><span className="text-xs font-semibold">Cancel</span>
-        </button>
-      </div>
-    </GlassCard>
+    <button
+      onClick={onClick}
+      className={cn(
+        "rounded-2xl py-3 flex flex-col items-center gap-1 tap-scale transition-all",
+        tone === "success" && "gradient-primary text-white shadow-glow",
+        tone === "danger" && "bg-destructive-container text-destructive-container-foreground",
+        tone === "muted" && "surface-low text-foreground hover:bg-surface-mid",
+      )}
+    >
+      <span className="material-symbols-outlined ms-fill" style={{ fontSize: 22 }}>{icon}</span>
+      <span className="text-[11px] font-headline font-bold">{label}</span>
+    </button>
   );
 }
