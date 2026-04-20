@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import Home from "./pages/Home";
 import Subjects from "./pages/Subjects";
 import SubjectForm from "./pages/SubjectForm";
+import UploadTimetable from "./pages/UploadTimetable";
 import BunkCalculator from "./pages/BunkCalculator";
 import Timetable from "./pages/Timetable";
 import Analytics from "./pages/Analytics";
@@ -38,7 +39,8 @@ const App = () => (
               <Route path="/app" element={<RequireAuth><AppShell /></RequireAuth>}>
                 <Route index element={<Home />} />
                 <Route path="subjects" element={<Subjects />} />
-                <Route path="subjects/new" element={<SubjectForm />} />
+                <Route path="subjects/new" element={<UploadTimetable />} />
+                <Route path="subjects/manual" element={<SubjectForm />} />
                 <Route path="subjects/:id/edit" element={<SubjectForm />} />
                 <Route path="bunk" element={<BunkCalculator />} />
                 <Route path="timetable" element={<Timetable />} />

@@ -61,11 +61,14 @@ export default function Subjects() {
 
       {!isLoading && subjects.length === 0 && (
         <div className="bg-card rounded-xl text-center py-10 shadow-card">
-          <div className="text-5xl mb-2">📚</div>
+          <div className="text-5xl mb-2">📸</div>
           <p className="font-headline font-bold">No subjects yet</p>
-          <p className="text-sm text-muted-foreground mb-4">Add your first subject to start tracking.</p>
+          <p className="text-sm text-muted-foreground mb-4 px-6">Snap a photo of your timetable — AI will set everything up.</p>
           <Link to="/app/subjects/new">
-            <Button className="gradient-primary border-0 rounded-xl text-white shadow-glow">Add subject</Button>
+            <Button className="gradient-primary border-0 rounded-xl text-white shadow-glow">
+              <span className="material-symbols-outlined mr-2" style={{ fontSize: 18 }}>add_a_photo</span>
+              Scan timetable
+            </Button>
           </Link>
         </div>
       )}
