@@ -104,7 +104,7 @@ export default function Auth() {
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Pavan"
+                placeholder="Enter your name"
                 required
                 className="h-12 rounded-2xl border-0 surface-low focus-visible:bg-card focus-visible:ring-2 focus-visible:ring-primary/30"
               />

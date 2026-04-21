@@ -125,10 +125,17 @@ export default function UploadTimetable() {
           </div>
 
           <button
-            onClick={() => nav("/app/subjects/new")}
-            className="w-full text-center text-sm text-muted-foreground font-medium tap-scale py-3"
+            onClick={() => nav("/app/subjects/manual")}
+            className="w-full surface-low rounded-3xl p-6 flex items-center gap-4 tap-scale border border-border/50"
           >
-            Or add subjects manually →
+            <div className="h-12 w-12 rounded-2xl bg-primary/10 grid place-items-center shrink-0">
+              <span className="material-symbols-outlined text-primary" style={{ fontSize: 26 }}>edit_calendar</span>
+            </div>
+            <div className="flex-1 text-left">
+              <p className="font-headline font-bold text-base">Enter manually</p>
+              <p className="text-xs text-muted-foreground font-medium mt-0.5">Add subjects with day & time slots</p>
+            </div>
+            <span className="material-symbols-outlined text-muted-foreground" style={{ fontSize: 22 }}>chevron_right</span>
           </button>
         </div>
       )}
