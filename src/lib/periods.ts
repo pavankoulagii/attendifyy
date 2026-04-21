@@ -38,6 +38,44 @@ export interface ExtractedSubject {
 
 const COLORS = ["#7c3aed", "#3b82f6", "#06b6d4", "#10b981", "#eab308", "#f97316", "#ef4444", "#ec4899"];
 
+export interface PeriodInput {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  room?: string | null;
+}
+
+export function useSavePeriods() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ subjectId, periods }: { subjectId: string; periods: PeriodInput[] }) => {
+      if (!user) throw new Error("not authed");
+      // Replace strategy: delete existing then insert
+      const { error: dErr } = await supabase
+        .from("class_periods")
+        .delete()
+        .eq("subject_id", subjectId);
+      if (dErr) throw dErr;
+      if (periods.length === 0) return;
+      const rows = periods.map((p) => ({
+        user_id: user.id,
+        subject_id: subjectId,
+        day_of_week: p.day_of_week,
+        start_time: normalizeTime(p.start_time),
+        end_time: normalizeTime(p.end_time),
+        room: p.room || null,
+      }));
+      const { error } = await supabase.from("class_periods").insert(rows);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["periods"] });
+      qc.invalidateQueries({ queryKey: ["subjects"] });
+    },
+  });
+}
+
 export function useImportTimetable() {
   const qc = useQueryClient();
   const { user } = useAuth();
