@@ -1,8 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useUpdateProfile } from "@/lib/data";
 
 const features = [
   { icon: "all_inclusive", text: "Unlimited subjects" },
@@ -21,9 +22,48 @@ const plans = [
   { id: "yearly", name: "Pro Yearly", price: "₹199", sub: "per year · save 66%", desc: "Best value", best: true },
 ];
 
+type PayStage = "idle" | "scan" | "processing" | "success";
+
 export default function Premium() {
   const nav = useNavigate();
   const [plan, setPlan] = useState("yearly");
+  const [stage, setStage] = useState<PayStage>("idle");
+  const updateProfile = useUpdateProfile();
+
+  const selectedPlan = plans.find((p) => p.id === plan)!;
+  const amount = selectedPlan.price;
+
+  // Auto-advance from scan -> processing -> success
+  useEffect(() => {
+    if (stage === "scan") {
+      const t = setTimeout(() => setStage("processing"), 3500);
+      return () => clearTimeout(t);
+    }
+    if (stage === "processing") {
+      const t = setTimeout(async () => {
+        try {
+          await updateProfile.mutateAsync({ is_premium: true });
+          setStage("success");
+        } catch (e: any) {
+          toast.error(e?.message || "Payment failed");
+          setStage("idle");
+        }
+      }, 2200);
+      return () => clearTimeout(t);
+    }
+  }, [stage]);
+
+  const startPayment = () => {
+    if (plan === "free") {
+      nav("/app");
+      return;
+    }
+    setStage("scan");
+  };
+
+  if (stage !== "idle") {
+    return <PaymentFlow stage={stage} amount={amount} planName={selectedPlan.name} onClose={() => setStage("idle")} onDone={() => nav("/app/profile")} />;
+  }
 
   return (
     <main className="px-5 pt-6 pb-8 space-y-6 animate-fade-in">
@@ -107,13 +147,135 @@ export default function Premium() {
 
       {/* CTA */}
       <Button
-        onClick={() => toast("Payments coming soon — UI preview only", { icon: "✨" as any })}
+        onClick={startPayment}
         className="w-full h-14 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale flex items-center justify-center gap-2"
       >
-        <span className="material-symbols-outlined ms-fill" style={{ fontSize: 22 }}>auto_awesome</span>
-        {plan === "free" ? "Continue free" : "Start free trial"}
+        <span className="material-symbols-outlined ms-fill" style={{ fontSize: 22 }}>
+          {plan === "free" ? "auto_awesome" : "qr_code_scanner"}
+        </span>
+        {plan === "free" ? "Continue free" : `Pay ${amount} via UPI`}
       </Button>
-      <p className="text-center text-[11px] text-muted-foreground font-medium">Auto-renews. Cancel anytime.</p>
+      <p className="text-center text-[11px] text-muted-foreground font-medium">Secure UPI payment · Cancel anytime</p>
     </main>
+  );
+}
+
+function PaymentFlow({
+  stage,
+  amount,
+  planName,
+  onClose,
+  onDone,
+}: {
+  stage: PayStage;
+  amount: string;
+  planName: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  return (
+    <main className="min-h-[100dvh] px-5 pt-6 pb-8 flex flex-col animate-fade-in">
+      {/* Header */}
+      <header className="flex items-center gap-3 mb-6">
+        {stage === "scan" && (
+          <button onClick={onClose} className="h-11 w-11 rounded-full glass grid place-items-center text-primary tap-scale shadow-soft">
+            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
+          </button>
+        )}
+        <div>
+          <p className="text-[11px] uppercase tracking-widest font-bold text-primary">{planName}</p>
+          <h1 className="font-headline font-extrabold text-xl tracking-tight">
+            {stage === "scan" ? "Scan to pay" : stage === "processing" ? "Processing…" : "Payment successful"}
+          </h1>
+        </div>
+      </header>
+
+      <div className="flex-1 flex flex-col items-center justify-center space-y-6">
+        {stage === "scan" && (
+          <>
+            <div className="bg-card rounded-3xl p-6 shadow-card w-full max-w-xs space-y-4">
+              <div className="aspect-square rounded-2xl bg-white p-4 grid place-items-center relative overflow-hidden">
+                {/* Mock QR */}
+                <QRMock />
+                {/* Scan line */}
+                <div className="absolute inset-x-4 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line" />
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground font-medium">Pay to</p>
+                <p className="font-headline font-bold text-base">attendify@upi</p>
+                <p className="font-headline font-black text-3xl mt-2 text-gradient">{amount}</p>
+              </div>
+              <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground font-medium">
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
+                Secured by Lovable Pay
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground font-medium text-center max-w-xs">
+              Open any UPI app · GPay, PhonePe, Paytm · Scan the code to complete payment
+            </p>
+          </>
+        )}
+
+        {stage === "processing" && (
+          <div className="flex flex-col items-center gap-5">
+            <div className="h-24 w-24 rounded-full gradient-primary shadow-glow grid place-items-center animate-pulse">
+              <span className="material-symbols-outlined ms-fill text-white animate-spin" style={{ fontSize: 44, animationDuration: "1.4s" }}>
+                progress_activity
+              </span>
+            </div>
+            <div className="text-center space-y-1">
+              <p className="font-headline font-bold text-lg">Verifying payment</p>
+              <p className="text-xs text-muted-foreground font-medium">Please don't close this screen…</p>
+            </div>
+          </div>
+        )}
+
+        {stage === "success" && (
+          <div className="flex flex-col items-center gap-5 animate-fade-in">
+            <div className="h-28 w-28 rounded-full bg-emerald-500/15 grid place-items-center">
+              <div className="h-20 w-20 rounded-full bg-emerald-500 grid place-items-center shadow-glow">
+                <span className="material-symbols-outlined ms-fill text-white" style={{ fontSize: 48 }}>check</span>
+              </div>
+            </div>
+            <div className="text-center space-y-1">
+              <p className="font-headline font-extrabold text-2xl">Welcome to Pro 🎉</p>
+              <p className="text-sm text-muted-foreground font-medium">Paid {amount} · {planName}</p>
+            </div>
+            <Button
+              onClick={onDone}
+              className="h-12 px-8 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale"
+            >
+              Continue
+            </Button>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
+
+function QRMock() {
+  // Deterministic pseudo-random QR pattern
+  const cells = Array.from({ length: 21 * 21 }, (_, i) => {
+    const x = i % 21;
+    const y = Math.floor(i / 21);
+    // Finder squares (top-left, top-right, bottom-left)
+    const inFinder =
+      (x < 7 && y < 7) || (x >= 14 && y < 7) || (x < 7 && y >= 14);
+    if (inFinder) {
+      const fx = x >= 14 ? x - 14 : x;
+      const fy = y >= 14 ? y - 14 : y;
+      const onEdge = fx === 0 || fx === 6 || fy === 0 || fy === 6;
+      const inner = fx >= 2 && fx <= 4 && fy >= 2 && fy <= 4;
+      return onEdge || inner;
+    }
+    return ((x * 31 + y * 17 + x * y) % 5) < 2;
+  });
+  return (
+    <div className="grid w-full h-full" style={{ gridTemplateColumns: "repeat(21, 1fr)", gap: 1 }}>
+      {cells.map((on, i) => (
+        <div key={i} className={on ? "bg-black" : "bg-white"} />
+      ))}
+    </div>
   );
 }
