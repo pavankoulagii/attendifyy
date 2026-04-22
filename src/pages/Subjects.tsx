@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useDeleteSubject, useMarkAttendance, useSubjects, type Subject } from "@/lib/data";
+import { Link, useNavigate } from "react-router-dom";
+import { useDeleteSubject, useMarkAttendance, useSubjects, useProfile, type Subject } from "@/lib/data";
 import { healthStatus, percent, safeBunks } from "@/lib/attendance";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,11 +9,25 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger,
 } from "@/components/ui/drawer";
 
+const FREE_SUBJECT_LIMIT = 5;
+
 export default function Subjects() {
+  const nav = useNavigate();
   const { data: subjects = [], isLoading } = useSubjects();
+  const { data: profile } = useProfile();
   const mark = useMarkAttendance();
   const del = useDeleteSubject();
   const [, setActive] = useState<Subject | null>(null);
+  const isPremium = !!profile?.is_premium;
+  const atLimit = !isPremium && subjects.length >= FREE_SUBJECT_LIMIT;
+
+  const handleAdd = (e: React.MouseEvent) => {
+    if (atLimit) {
+      e.preventDefault();
+      toast.error(`Free plan: ${FREE_SUBJECT_LIMIT} subjects only. Upgrade to Pro for unlimited.`);
+      nav("/app/premium");
+    }
+  };
 
   // overall
   const totalHeld = subjects.reduce((a, s) => a + s.classes_held, 0);
@@ -160,11 +174,19 @@ export default function Subjects() {
       </div>
 
       {/* FAB */}
-      <Link to="/app/subjects/new" className="fixed bottom-28 right-6 z-40">
+      <Link to="/app/subjects/new" onClick={handleAdd} className="fixed bottom-28 right-6 z-40">
         <button className="w-16 h-16 gradient-primary text-white rounded-full grid place-items-center shadow-glow tap-scale">
-          <span className="material-symbols-outlined" style={{ fontSize: 30 }}>add</span>
+          <span className="material-symbols-outlined" style={{ fontSize: 30 }}>{atLimit ? "lock" : "add"}</span>
         </button>
       </Link>
+
+      {atLimit && (
+        <div className="fixed bottom-28 left-5 right-24 z-30 surface-low rounded-xl px-3 py-2 shadow-soft">
+          <p className="text-[11px] font-bold text-muted-foreground">
+            Free limit reached · <Link to="/app/premium" className="text-primary">Upgrade</Link> for unlimited
+          </p>
+        </div>
+      )}
     </main>
   );
 }

@@ -7,8 +7,8 @@ import { toast } from "sonner";
 import { useUpdateProfile } from "@/lib/data";
 import upiQr from "@/assets/upi-qr.jpg";
 
-const UPI_ID = "jyotizalaki@ybl";
-const UPI_NAME = "JYOTI V ZALAKI";
+const UPI_ID = "attendify@ybl";
+const UPI_NAME = "Attendify";
 
 const features = [
   { icon: "all_inclusive", text: "Unlimited subjects" },
@@ -22,9 +22,9 @@ const features = [
 ];
 
 const plans = [
-  { id: "free", name: "Free", price: "₹0", amount: 0, sub: "Forever", desc: "Up to 5 subjects" },
-  { id: "monthly", name: "Pro Monthly", price: "₹49", amount: 49, sub: "per month", desc: "Cancel anytime" },
-  { id: "yearly", name: "Pro Yearly", price: "₹199", amount: 199, sub: "per year · save 66%", desc: "Best value", best: true },
+  { id: "free", name: "Free", price: "₹0", amount: 0, sub: "Forever", desc: "5 subjects only" },
+  { id: "monthly", name: "Pro Monthly", price: "₹149", amount: 149, sub: "per month", desc: "Cancel anytime" },
+  { id: "yearly", name: "Pro Yearly", price: "₹199", amount: 199, sub: "per year · save 88%", desc: "Best value", best: true },
 ];
 
 type PayStage = "idle" | "scan" | "txn" | "processing" | "success";
@@ -229,10 +229,10 @@ function PaymentFlow({
       <div className="flex-1 flex flex-col items-center justify-center space-y-6">
         {stage === "scan" && (
           <>
-            <div className="bg-card rounded-3xl p-6 shadow-card w-full max-w-xs space-y-4">
-              <div className="aspect-square rounded-2xl bg-white p-3 grid place-items-center relative overflow-hidden">
-                <img src={upiQr} alt="PhonePe UPI QR code" className="w-full h-full object-contain" />
-                <div className="absolute inset-x-4 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line pointer-events-none" />
+            <div className="bg-card rounded-3xl p-5 shadow-card w-full max-w-sm space-y-4">
+              <div className="rounded-2xl bg-white p-4 relative overflow-hidden">
+                <img src={upiQr} alt="UPI QR code" className="w-full h-auto block" />
+                <div className="absolute inset-x-6 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line pointer-events-none" />
               </div>
               <div className="text-center space-y-1">
                 <p className="text-xs text-muted-foreground font-medium">Pay to</p>
