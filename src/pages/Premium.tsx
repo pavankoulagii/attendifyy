@@ -229,10 +229,10 @@ function PaymentFlow({
       <div className="flex-1 flex flex-col items-center justify-center space-y-6">
         {stage === "scan" && (
           <>
-            <div className="bg-card rounded-3xl p-6 shadow-card w-full max-w-xs space-y-4">
-              <div className="aspect-square rounded-2xl bg-white p-3 grid place-items-center relative overflow-hidden">
-                <img src={upiQr} alt="PhonePe UPI QR code" className="w-full h-full object-contain" />
-                <div className="absolute inset-x-4 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line pointer-events-none" />
+            <div className="bg-card rounded-3xl p-5 shadow-card w-full max-w-sm space-y-4">
+              <div className="rounded-2xl bg-white p-4 relative overflow-hidden">
+                <img src={upiQr} alt="UPI QR code" className="w-full h-auto block" />
+                <div className="absolute inset-x-6 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line pointer-events-none" />
               </div>
               <div className="text-center space-y-1">
                 <p className="text-xs text-muted-foreground font-medium">Pay to</p>
