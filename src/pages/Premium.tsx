@@ -270,12 +270,6 @@ function PaymentFlow({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const previewUrl = proofFile ? URL.createObjectURL(proofFile) : null;
-  onProceedToTxn: () => void;
-  onSubmitTxn: () => void;
-  onBack: () => void;
-  onClose: () => void;
-  onDone: () => void;
-}) {
   return (
     <main className="min-h-[100dvh] px-5 pt-6 pb-12 flex flex-col animate-fade-in overflow-y-auto">
       {/* Header */}
