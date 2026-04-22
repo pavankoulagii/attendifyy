@@ -2,9 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { useUpdateProfile } from "@/lib/data";
+import { useUpdateProfile, useProfile } from "@/lib/data";
+import { supabase } from "@/integrations/supabase/client";
 import upiQr from "@/assets/upi-qr.jpg";
 
 const UPI_ID = "attendify@ybl";
@@ -56,8 +57,22 @@ export default function Premium() {
     }
     setStage("processing");
     try {
+      // 1) Reject if this txn ID was already used by anyone
+      const { data: existing, error: lookupError } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("upi_txn_id", trimmed)
+        .maybeSingle();
+      if (lookupError) throw lookupError;
+      if (existing) {
+        toast.error("This transaction ID has already been used. Use a new payment.");
+        setStage("txn");
+        return;
+      }
+
       // brief delay so the verifying screen feels real
-      await new Promise((r) => setTimeout(r, 1600));
+      await new Promise((r) => setTimeout(r, 1200));
+
       await updateProfile.mutateAsync({
         is_premium: true,
         upi_txn_id: trimmed,
@@ -66,7 +81,12 @@ export default function Premium() {
       } as any);
       setStage("success");
     } catch (e: any) {
-      toast.error(e?.message || "Could not confirm payment");
+      const msg = String(e?.message || "");
+      if (msg.includes("profiles_upi_txn_id_unique") || msg.toLowerCase().includes("duplicate")) {
+        toast.error("This transaction ID has already been used.");
+      } else {
+        toast.error(msg || "Could not confirm payment");
+      }
       setStage("txn");
     }
   };
@@ -207,7 +227,7 @@ function PaymentFlow({
   onDone: () => void;
 }) {
   return (
-    <main className="min-h-[100dvh] px-5 pt-6 pb-8 flex flex-col animate-fade-in">
+    <main className="min-h-[100dvh] px-5 pt-6 pb-12 flex flex-col animate-fade-in overflow-y-auto">
       {/* Header */}
       <header className="flex items-center gap-3 mb-6">
         {(stage === "scan" || stage === "txn") && (
