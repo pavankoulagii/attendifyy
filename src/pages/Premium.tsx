@@ -2,9 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useUpdateProfile } from "@/lib/data";
+import { supabase } from "@/integrations/supabase/client";
 import upiQr from "@/assets/upi-qr.jpg";
 
 const UPI_ID = "attendify@ybl";
@@ -23,8 +24,8 @@ const features = [
 
 const plans = [
   { id: "free", name: "Free", price: "₹0", amount: 0, sub: "Forever", desc: "5 subjects only" },
-  { id: "monthly", name: "Pro Monthly", price: "₹149", amount: 149, sub: "per month", desc: "Cancel anytime" },
-  { id: "yearly", name: "Pro Yearly", price: "₹199", amount: 199, sub: "per year · save 88%", desc: "Best value", best: true },
+  { id: "monthly", name: "Pro Monthly", price: "₹49", amount: 49, sub: "per month", desc: "Cancel anytime" },
+  { id: "yearly", name: "Pro Yearly", price: "₹149", amount: 149, sub: "per year · save 75%", desc: "Best value", best: true },
 ];
 
 type PayStage = "idle" | "scan" | "txn" | "processing" | "success";
@@ -56,8 +57,22 @@ export default function Premium() {
     }
     setStage("processing");
     try {
+      // 1) Reject if this txn ID was already used by anyone
+      const { data: existing, error: lookupError } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("upi_txn_id", trimmed)
+        .maybeSingle();
+      if (lookupError) throw lookupError;
+      if (existing) {
+        toast.error("This transaction ID has already been used. Use a new payment.");
+        setStage("txn");
+        return;
+      }
+
       // brief delay so the verifying screen feels real
-      await new Promise((r) => setTimeout(r, 1600));
+      await new Promise((r) => setTimeout(r, 1200));
+
       await updateProfile.mutateAsync({
         is_premium: true,
         upi_txn_id: trimmed,
@@ -66,7 +81,12 @@ export default function Premium() {
       } as any);
       setStage("success");
     } catch (e: any) {
-      toast.error(e?.message || "Could not confirm payment");
+      const msg = String(e?.message || "");
+      if (msg.includes("profiles_upi_txn_id_unique") || msg.toLowerCase().includes("duplicate")) {
+        toast.error("This transaction ID has already been used.");
+      } else {
+        toast.error(msg || "Could not confirm payment");
+      }
       setStage("txn");
     }
   };
@@ -207,7 +227,7 @@ function PaymentFlow({
   onDone: () => void;
 }) {
   return (
-    <main className="min-h-[100dvh] px-5 pt-6 pb-8 flex flex-col animate-fade-in">
+    <main className="min-h-[100dvh] px-5 pt-6 pb-12 flex flex-col animate-fade-in overflow-y-auto">
       {/* Header */}
       <header className="flex items-center gap-3 mb-6">
         {(stage === "scan" || stage === "txn") && (
@@ -229,10 +249,15 @@ function PaymentFlow({
       <div className="flex-1 flex flex-col items-center justify-center space-y-6">
         {stage === "scan" && (
           <>
-            <div className="bg-card rounded-3xl p-5 shadow-card w-full max-w-sm space-y-4">
-              <div className="rounded-2xl bg-white p-4 relative overflow-hidden">
-                <img src={upiQr} alt="UPI QR code" className="w-full h-auto block" />
-                <div className="absolute inset-x-6 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line pointer-events-none" />
+            <div className="bg-card rounded-3xl p-4 shadow-card w-full max-w-xs space-y-3">
+              <div className="rounded-2xl bg-white relative overflow-hidden aspect-square">
+                <img
+                  src={upiQr}
+                  alt="UPI QR code"
+                  className="absolute inset-0 w-full h-full block"
+                  style={{ objectFit: "cover", objectPosition: "center 47%", transform: "scale(2.1)", transformOrigin: "center 47%" }}
+                />
+                <div className="absolute inset-x-4 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line pointer-events-none z-10" />
               </div>
               <div className="text-center space-y-1">
                 <p className="text-xs text-muted-foreground font-medium">Pay to</p>
