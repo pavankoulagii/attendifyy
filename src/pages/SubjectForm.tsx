@@ -71,6 +71,15 @@ export default function SubjectForm() {
     for (const p of periods) {
       if (p.start_time >= p.end_time) return toast.error("Start time must be before end time");
     }
+    // Free-tier subject limit
+    if (!editing) {
+      const { data: prof } = await supabase.from("profiles").select("is_premium").eq("user_id", user!.id).maybeSingle();
+      if (!prof?.is_premium && subjects.length >= 5) {
+        toast.error("Free plan: 5 subjects only. Upgrade to Pro for unlimited.");
+        nav("/app/premium");
+        return;
+      }
+    }
 
     setSubmitting(true);
     try {
