@@ -2,11 +2,20 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useUpdateProfile } from "@/lib/data";
+import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import upiQr from "@/assets/upi-qr.jpg";
+
+// Strict UTR validator: 12 digits, not all-same, not trivial sequence
+function isValidUtr(s: string): boolean {
+  if (!/^\d{12}$/.test(s)) return false;
+  if (/^(\d)\1{11}$/.test(s)) return false; // 000000000000, 111111111111, ...
+  if (s === "123456789012" || s === "012345678901") return false;
+  return true;
+}
 
 const UPI_ID = "attendify@ybl";
 const UPI_NAME = "Attendify";
@@ -32,9 +41,11 @@ type PayStage = "idle" | "scan" | "txn" | "processing" | "success";
 
 export default function Premium() {
   const nav = useNavigate();
+  const { user } = useAuth();
   const [plan, setPlan] = useState("yearly");
   const [stage, setStage] = useState<PayStage>("idle");
   const [txnId, setTxnId] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
   const updateProfile = useUpdateProfile();
 
   const selectedPlan = plans.find((p) => p.id === plan)!;
@@ -46,15 +57,33 @@ export default function Premium() {
       return;
     }
     setTxnId("");
+    setProofFile(null);
     setStage("scan");
   };
 
   const submitTxn = async () => {
     const trimmed = txnId.trim();
-    if (trimmed.length < 8 || trimmed.length > 30) {
-      toast.error("Enter a valid UPI transaction ID (8–30 chars)");
+    if (!isValidUtr(trimmed)) {
+      toast.error("UTR must be exactly 12 digits (check your UPI app)");
       return;
     }
+    if (!proofFile) {
+      toast.error("Please upload a screenshot of the payment success");
+      return;
+    }
+    if (!proofFile.type.startsWith("image/")) {
+      toast.error("Screenshot must be an image (PNG/JPG)");
+      return;
+    }
+    if (proofFile.size > 5 * 1024 * 1024) {
+      toast.error("Screenshot must be under 5 MB");
+      return;
+    }
+    if (!user) {
+      toast.error("Please sign in again");
+      return;
+    }
+
     setStage("processing");
     try {
       // 1) Reject if this txn ID was already used by anyone
@@ -65,19 +94,26 @@ export default function Premium() {
         .maybeSingle();
       if (lookupError) throw lookupError;
       if (existing) {
-        toast.error("This transaction ID has already been used. Use a new payment.");
+        toast.error("This transaction ID has already been used.");
         setStage("txn");
         return;
       }
 
-      // brief delay so the verifying screen feels real
-      await new Promise((r) => setTimeout(r, 1200));
+      // 2) Upload screenshot to private bucket under user's folder
+      const ext = (proofFile.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `${user.id}/${trimmed}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("payment-proofs")
+        .upload(path, proofFile, { contentType: proofFile.type, upsert: false });
+      if (upErr) throw upErr;
 
+      // 3) Activate Pro
       await updateProfile.mutateAsync({
         is_premium: true,
         upi_txn_id: trimmed,
         premium_plan: plan,
         premium_paid_at: new Date().toISOString(),
+        payment_proof_path: path,
       } as any);
       setStage("success");
     } catch (e: any) {
@@ -99,6 +135,8 @@ export default function Premium() {
         planName={selectedPlan.name}
         txnId={txnId}
         setTxnId={setTxnId}
+        proofFile={proofFile}
+        setProofFile={setProofFile}
         onProceedToTxn={() => setStage("txn")}
         onSubmitTxn={submitTxn}
         onBack={() => setStage(stage === "txn" ? "scan" : "idle")}
