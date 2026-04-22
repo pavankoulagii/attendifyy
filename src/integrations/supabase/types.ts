@@ -98,6 +98,7 @@ export type Database = {
           display_name: string | null
           id: string
           is_premium: boolean
+          payment_proof_path: string | null
           premium_paid_at: string | null
           premium_plan: string | null
           required_attendance: number
@@ -113,6 +114,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_premium?: boolean
+          payment_proof_path?: string | null
           premium_paid_at?: string | null
           premium_plan?: string | null
           required_attendance?: number
@@ -128,6 +130,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_premium?: boolean
+          payment_proof_path?: string | null
           premium_paid_at?: string | null
           premium_plan?: string | null
           required_attendance?: number
