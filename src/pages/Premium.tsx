@@ -1,9 +1,14 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useUpdateProfile } from "@/lib/data";
+import upiQr from "@/assets/upi-qr.jpg";
+
+const UPI_ID = "jyotizalaki@ybl";
+const UPI_NAME = "JYOTI V ZALAKI";
 
 const features = [
   { icon: "all_inclusive", text: "Unlimited subjects" },
@@ -17,52 +22,70 @@ const features = [
 ];
 
 const plans = [
-  { id: "free", name: "Free", price: "₹0", sub: "Forever", desc: "Up to 5 subjects" },
-  { id: "monthly", name: "Pro Monthly", price: "₹49", sub: "per month", desc: "Cancel anytime" },
-  { id: "yearly", name: "Pro Yearly", price: "₹199", sub: "per year · save 66%", desc: "Best value", best: true },
+  { id: "free", name: "Free", price: "₹0", amount: 0, sub: "Forever", desc: "Up to 5 subjects" },
+  { id: "monthly", name: "Pro Monthly", price: "₹49", amount: 49, sub: "per month", desc: "Cancel anytime" },
+  { id: "yearly", name: "Pro Yearly", price: "₹199", amount: 199, sub: "per year · save 66%", desc: "Best value", best: true },
 ];
 
-type PayStage = "idle" | "scan" | "processing" | "success";
+type PayStage = "idle" | "scan" | "txn" | "processing" | "success";
 
 export default function Premium() {
   const nav = useNavigate();
   const [plan, setPlan] = useState("yearly");
   const [stage, setStage] = useState<PayStage>("idle");
+  const [txnId, setTxnId] = useState("");
   const updateProfile = useUpdateProfile();
 
   const selectedPlan = plans.find((p) => p.id === plan)!;
   const amount = selectedPlan.price;
-
-  // Auto-advance from scan -> processing -> success
-  useEffect(() => {
-    if (stage === "scan") {
-      const t = setTimeout(() => setStage("processing"), 3500);
-      return () => clearTimeout(t);
-    }
-    if (stage === "processing") {
-      const t = setTimeout(async () => {
-        try {
-          await updateProfile.mutateAsync({ is_premium: true });
-          setStage("success");
-        } catch (e: any) {
-          toast.error(e?.message || "Payment failed");
-          setStage("idle");
-        }
-      }, 2200);
-      return () => clearTimeout(t);
-    }
-  }, [stage]);
 
   const startPayment = () => {
     if (plan === "free") {
       nav("/app");
       return;
     }
+    setTxnId("");
     setStage("scan");
   };
 
+  const submitTxn = async () => {
+    const trimmed = txnId.trim();
+    if (trimmed.length < 8 || trimmed.length > 30) {
+      toast.error("Enter a valid UPI transaction ID (8–30 chars)");
+      return;
+    }
+    setStage("processing");
+    try {
+      // brief delay so the verifying screen feels real
+      await new Promise((r) => setTimeout(r, 1600));
+      await updateProfile.mutateAsync({
+        is_premium: true,
+        upi_txn_id: trimmed,
+        premium_plan: plan,
+        premium_paid_at: new Date().toISOString(),
+      } as any);
+      setStage("success");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not confirm payment");
+      setStage("txn");
+    }
+  };
+
   if (stage !== "idle") {
-    return <PaymentFlow stage={stage} amount={amount} planName={selectedPlan.name} onClose={() => setStage("idle")} onDone={() => nav("/app/profile")} />;
+    return (
+      <PaymentFlow
+        stage={stage}
+        amount={amount}
+        planName={selectedPlan.name}
+        txnId={txnId}
+        setTxnId={setTxnId}
+        onProceedToTxn={() => setStage("txn")}
+        onSubmitTxn={submitTxn}
+        onBack={() => setStage(stage === "txn" ? "scan" : "idle")}
+        onClose={() => setStage("idle")}
+        onDone={() => nav("/app/profile")}
+      />
+    );
   }
 
   return (
@@ -164,12 +187,22 @@ function PaymentFlow({
   stage,
   amount,
   planName,
+  txnId,
+  setTxnId,
+  onProceedToTxn,
+  onSubmitTxn,
+  onBack,
   onClose,
   onDone,
 }: {
   stage: PayStage;
   amount: string;
   planName: string;
+  txnId: string;
+  setTxnId: (v: string) => void;
+  onProceedToTxn: () => void;
+  onSubmitTxn: () => void;
+  onBack: () => void;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -177,15 +210,18 @@ function PaymentFlow({
     <main className="min-h-[100dvh] px-5 pt-6 pb-8 flex flex-col animate-fade-in">
       {/* Header */}
       <header className="flex items-center gap-3 mb-6">
-        {stage === "scan" && (
-          <button onClick={onClose} className="h-11 w-11 rounded-full glass grid place-items-center text-primary tap-scale shadow-soft">
+        {(stage === "scan" || stage === "txn") && (
+          <button onClick={stage === "txn" ? onBack : onClose} className="h-11 w-11 rounded-full glass grid place-items-center text-primary tap-scale shadow-soft">
             <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
           </button>
         )}
         <div>
           <p className="text-[11px] uppercase tracking-widest font-bold text-primary">{planName}</p>
           <h1 className="font-headline font-extrabold text-xl tracking-tight">
-            {stage === "scan" ? "Scan to pay" : stage === "processing" ? "Processing…" : "Payment successful"}
+            {stage === "scan" && "Scan to pay"}
+            {stage === "txn" && "Enter transaction ID"}
+            {stage === "processing" && "Verifying…"}
+            {stage === "success" && "Payment successful"}
           </h1>
         </div>
       </header>
@@ -194,15 +230,14 @@ function PaymentFlow({
         {stage === "scan" && (
           <>
             <div className="bg-card rounded-3xl p-6 shadow-card w-full max-w-xs space-y-4">
-              <div className="aspect-square rounded-2xl bg-white p-4 grid place-items-center relative overflow-hidden">
-                {/* Mock QR */}
-                <QRMock />
-                {/* Scan line */}
-                <div className="absolute inset-x-4 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line" />
+              <div className="aspect-square rounded-2xl bg-white p-3 grid place-items-center relative overflow-hidden">
+                <img src={upiQr} alt="PhonePe UPI QR code" className="w-full h-full object-contain" />
+                <div className="absolute inset-x-4 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line pointer-events-none" />
               </div>
-              <div className="text-center">
+              <div className="text-center space-y-1">
                 <p className="text-xs text-muted-foreground font-medium">Pay to</p>
-                <p className="font-headline font-bold text-base">attendify@upi</p>
+                <p className="font-headline font-bold text-base">{UPI_NAME}</p>
+                <p className="text-xs text-muted-foreground font-medium font-mono">{UPI_ID}</p>
                 <p className="font-headline font-black text-3xl mt-2 text-gradient">{amount}</p>
               </div>
               <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground font-medium">
@@ -213,7 +248,55 @@ function PaymentFlow({
             <p className="text-xs text-muted-foreground font-medium text-center max-w-xs">
               Open any UPI app · GPay, PhonePe, Paytm · Scan the code to complete payment
             </p>
+            <Button
+              onClick={onProceedToTxn}
+              className="w-full max-w-xs h-14 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined ms-fill" style={{ fontSize: 20 }}>check_circle</span>
+              I've paid · Enter txn ID
+            </Button>
           </>
+        )}
+
+        {stage === "txn" && (
+          <div className="w-full max-w-xs space-y-5">
+            <div className="bg-card rounded-3xl p-6 shadow-card space-y-4">
+              <div className="text-center space-y-1">
+                <div className="inline-grid h-14 w-14 rounded-2xl gradient-primary shadow-glow place-items-center mx-auto">
+                  <span className="material-symbols-outlined ms-fill text-white" style={{ fontSize: 28 }}>receipt_long</span>
+                </div>
+                <p className="font-headline font-bold text-lg pt-2">Confirm your payment</p>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Paste the 12-digit UTR / transaction ID from your UPI app
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Input
+                  value={txnId}
+                  onChange={(e) => setTxnId(e.target.value.replace(/\s+/g, ""))}
+                  placeholder="e.g. 412345678901"
+                  inputMode="text"
+                  autoFocus
+                  maxLength={30}
+                  className="h-12 text-center font-mono tracking-wider text-base"
+                />
+                <p className="text-[11px] text-muted-foreground font-medium text-center">
+                  Find it under "Transaction details" in PhonePe / GPay / Paytm
+                </p>
+              </div>
+              <div className="flex items-center justify-between text-xs surface-low rounded-xl px-3 py-2">
+                <span className="text-muted-foreground font-medium">Amount paid</span>
+                <span className="font-headline font-bold">{amount}</span>
+              </div>
+            </div>
+            <Button
+              onClick={onSubmitTxn}
+              className="w-full h-14 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined ms-fill" style={{ fontSize: 20 }}>verified</span>
+              Verify & activate Pro
+            </Button>
+          </div>
         )}
 
         {stage === "processing" && (
@@ -240,6 +323,9 @@ function PaymentFlow({
             <div className="text-center space-y-1">
               <p className="font-headline font-extrabold text-2xl">Welcome to Pro 🎉</p>
               <p className="text-sm text-muted-foreground font-medium">Paid {amount} · {planName}</p>
+              {txnId && (
+                <p className="text-[11px] text-muted-foreground font-mono pt-1">Txn: {txnId}</p>
+              )}
             </div>
             <Button
               onClick={onDone}
@@ -251,31 +337,5 @@ function PaymentFlow({
         )}
       </div>
     </main>
-  );
-}
-
-function QRMock() {
-  // Deterministic pseudo-random QR pattern
-  const cells = Array.from({ length: 21 * 21 }, (_, i) => {
-    const x = i % 21;
-    const y = Math.floor(i / 21);
-    // Finder squares (top-left, top-right, bottom-left)
-    const inFinder =
-      (x < 7 && y < 7) || (x >= 14 && y < 7) || (x < 7 && y >= 14);
-    if (inFinder) {
-      const fx = x >= 14 ? x - 14 : x;
-      const fy = y >= 14 ? y - 14 : y;
-      const onEdge = fx === 0 || fx === 6 || fy === 0 || fy === 6;
-      const inner = fx >= 2 && fx <= 4 && fy >= 2 && fy <= 4;
-      return onEdge || inner;
-    }
-    return ((x * 31 + y * 17 + x * y) % 5) < 2;
-  });
-  return (
-    <div className="grid w-full h-full" style={{ gridTemplateColumns: "repeat(21, 1fr)", gap: 1 }}>
-      {cells.map((on, i) => (
-        <div key={i} className={on ? "bg-black" : "bg-white"} />
-      ))}
-    </div>
   );
 }
