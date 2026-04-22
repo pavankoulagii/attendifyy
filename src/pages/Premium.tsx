@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useUpdateProfile, useProfile } from "@/lib/data";
+import { useUpdateProfile } from "@/lib/data";
 import { supabase } from "@/integrations/supabase/client";
 import upiQr from "@/assets/upi-qr.jpg";
 
