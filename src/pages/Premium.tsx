@@ -342,17 +342,55 @@ function PaymentFlow({
               <div className="space-y-2">
                 <Input
                   value={txnId}
-                  onChange={(e) => setTxnId(e.target.value.replace(/\s+/g, ""))}
-                  placeholder="e.g. 412345678901"
-                  inputMode="text"
+                  onChange={(e) => setTxnId(e.target.value.replace(/\D+/g, "").slice(0, 12))}
+                  placeholder="123456789012"
+                  inputMode="numeric"
                   autoFocus
-                  maxLength={30}
-                  className="h-12 text-center font-mono tracking-wider text-base"
+                  maxLength={12}
+                  className="h-12 text-center font-mono tracking-widest text-base"
                 />
                 <p className="text-[11px] text-muted-foreground font-medium text-center">
-                  Find it under "Transaction details" in PhonePe / GPay / Paytm
+                  Exactly 12 digits · Find under "Transaction details" in PhonePe / GPay / Paytm
                 </p>
               </div>
+
+              {/* Screenshot upload */}
+              <div className="space-y-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => setProofFile(e.target.files?.[0] ?? null)}
+                />
+                {!previewUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="w-full h-24 rounded-xl surface-low border-2 border-dashed border-primary/30 grid place-items-center tap-scale"
+                  >
+                    <div className="text-center">
+                      <span className="material-symbols-outlined text-primary block" style={{ fontSize: 26 }}>add_photo_alternate</span>
+                      <p className="text-xs font-bold text-primary mt-0.5">Upload payment screenshot</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">Required · PNG/JPG · max 5MB</p>
+                    </div>
+                  </button>
+                ) : (
+                  <div className="relative rounded-xl overflow-hidden surface-low">
+                    <img src={previewUrl} alt="Payment screenshot" className="w-full max-h-44 object-contain bg-black/5" />
+                    <button
+                      type="button"
+                      onClick={() => { setProofFile(null); if (fileRef.current) fileRef.current.value = ""; }}
+                      className="absolute top-2 right-2 h-8 w-8 rounded-full bg-background/90 grid place-items-center shadow-soft tap-scale"
+                      aria-label="Remove screenshot"
+                    >
+                      <span className="material-symbols-outlined text-destructive" style={{ fontSize: 18 }}>close</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center justify-between text-xs surface-low rounded-xl px-3 py-2">
                 <span className="text-muted-foreground font-medium">Amount paid</span>
                 <span className="font-headline font-bold">{amount}</span>
