@@ -2,11 +2,20 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useUpdateProfile } from "@/lib/data";
+import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import upiQr from "@/assets/upi-qr.jpg";
+
+// Strict UTR validator: 12 digits, not all-same, not trivial sequence
+function isValidUtr(s: string): boolean {
+  if (!/^\d{12}$/.test(s)) return false;
+  if (/^(\d)\1{11}$/.test(s)) return false; // 000000000000, 111111111111, ...
+  if (s === "123456789012" || s === "012345678901") return false;
+  return true;
+}
 
 const UPI_ID = "attendify@ybl";
 const UPI_NAME = "Attendify";
@@ -32,9 +41,11 @@ type PayStage = "idle" | "scan" | "txn" | "processing" | "success";
 
 export default function Premium() {
   const nav = useNavigate();
+  const { user } = useAuth();
   const [plan, setPlan] = useState("yearly");
   const [stage, setStage] = useState<PayStage>("idle");
   const [txnId, setTxnId] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
   const updateProfile = useUpdateProfile();
 
   const selectedPlan = plans.find((p) => p.id === plan)!;
@@ -46,15 +57,33 @@ export default function Premium() {
       return;
     }
     setTxnId("");
+    setProofFile(null);
     setStage("scan");
   };
 
   const submitTxn = async () => {
     const trimmed = txnId.trim();
-    if (trimmed.length < 8 || trimmed.length > 30) {
-      toast.error("Enter a valid UPI transaction ID (8–30 chars)");
+    if (!isValidUtr(trimmed)) {
+      toast.error("UTR must be exactly 12 digits (check your UPI app)");
       return;
     }
+    if (!proofFile) {
+      toast.error("Please upload a screenshot of the payment success");
+      return;
+    }
+    if (!proofFile.type.startsWith("image/")) {
+      toast.error("Screenshot must be an image (PNG/JPG)");
+      return;
+    }
+    if (proofFile.size > 5 * 1024 * 1024) {
+      toast.error("Screenshot must be under 5 MB");
+      return;
+    }
+    if (!user) {
+      toast.error("Please sign in again");
+      return;
+    }
+
     setStage("processing");
     try {
       // 1) Reject if this txn ID was already used by anyone
@@ -65,19 +94,26 @@ export default function Premium() {
         .maybeSingle();
       if (lookupError) throw lookupError;
       if (existing) {
-        toast.error("This transaction ID has already been used. Use a new payment.");
+        toast.error("This transaction ID has already been used.");
         setStage("txn");
         return;
       }
 
-      // brief delay so the verifying screen feels real
-      await new Promise((r) => setTimeout(r, 1200));
+      // 2) Upload screenshot to private bucket under user's folder
+      const ext = (proofFile.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `${user.id}/${trimmed}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("payment-proofs")
+        .upload(path, proofFile, { contentType: proofFile.type, upsert: false });
+      if (upErr) throw upErr;
 
+      // 3) Activate Pro
       await updateProfile.mutateAsync({
         is_premium: true,
         upi_txn_id: trimmed,
         premium_plan: plan,
         premium_paid_at: new Date().toISOString(),
+        payment_proof_path: path,
       } as any);
       setStage("success");
     } catch (e: any) {
@@ -99,6 +135,8 @@ export default function Premium() {
         planName={selectedPlan.name}
         txnId={txnId}
         setTxnId={setTxnId}
+        proofFile={proofFile}
+        setProofFile={setProofFile}
         onProceedToTxn={() => setStage("txn")}
         onSubmitTxn={submitTxn}
         onBack={() => setStage(stage === "txn" ? "scan" : "idle")}
@@ -209,6 +247,8 @@ function PaymentFlow({
   planName,
   txnId,
   setTxnId,
+  proofFile,
+  setProofFile,
   onProceedToTxn,
   onSubmitTxn,
   onBack,
@@ -220,12 +260,16 @@ function PaymentFlow({
   planName: string;
   txnId: string;
   setTxnId: (v: string) => void;
+  proofFile: File | null;
+  setProofFile: (f: File | null) => void;
   onProceedToTxn: () => void;
   onSubmitTxn: () => void;
   onBack: () => void;
   onClose: () => void;
   onDone: () => void;
 }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const previewUrl = proofFile ? URL.createObjectURL(proofFile) : null;
   return (
     <main className="min-h-[100dvh] px-5 pt-6 pb-12 flex flex-col animate-fade-in overflow-y-auto">
       {/* Header */}
@@ -298,17 +342,55 @@ function PaymentFlow({
               <div className="space-y-2">
                 <Input
                   value={txnId}
-                  onChange={(e) => setTxnId(e.target.value.replace(/\s+/g, ""))}
-                  placeholder="e.g. 412345678901"
-                  inputMode="text"
+                  onChange={(e) => setTxnId(e.target.value.replace(/\D+/g, "").slice(0, 12))}
+                  placeholder="123456789012"
+                  inputMode="numeric"
                   autoFocus
-                  maxLength={30}
-                  className="h-12 text-center font-mono tracking-wider text-base"
+                  maxLength={12}
+                  className="h-12 text-center font-mono tracking-widest text-base"
                 />
                 <p className="text-[11px] text-muted-foreground font-medium text-center">
-                  Find it under "Transaction details" in PhonePe / GPay / Paytm
+                  Exactly 12 digits · Find under "Transaction details" in PhonePe / GPay / Paytm
                 </p>
               </div>
+
+              {/* Screenshot upload */}
+              <div className="space-y-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => setProofFile(e.target.files?.[0] ?? null)}
+                />
+                {!previewUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="w-full h-24 rounded-xl surface-low border-2 border-dashed border-primary/30 grid place-items-center tap-scale"
+                  >
+                    <div className="text-center">
+                      <span className="material-symbols-outlined text-primary block" style={{ fontSize: 26 }}>add_photo_alternate</span>
+                      <p className="text-xs font-bold text-primary mt-0.5">Upload payment screenshot</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">Required · PNG/JPG · max 5MB</p>
+                    </div>
+                  </button>
+                ) : (
+                  <div className="relative rounded-xl overflow-hidden surface-low">
+                    <img src={previewUrl} alt="Payment screenshot" className="w-full max-h-44 object-contain bg-black/5" />
+                    <button
+                      type="button"
+                      onClick={() => { setProofFile(null); if (fileRef.current) fileRef.current.value = ""; }}
+                      className="absolute top-2 right-2 h-8 w-8 rounded-full bg-background/90 grid place-items-center shadow-soft tap-scale"
+                      aria-label="Remove screenshot"
+                    >
+                      <span className="material-symbols-outlined text-destructive" style={{ fontSize: 18 }}>close</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center justify-between text-xs surface-low rounded-xl px-3 py-2">
                 <span className="text-muted-foreground font-medium">Amount paid</span>
                 <span className="font-headline font-bold">{amount}</span>
