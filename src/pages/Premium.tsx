@@ -7,8 +7,8 @@ import { toast } from "sonner";
 import { useUpdateProfile } from "@/lib/data";
 import upiQr from "@/assets/upi-qr.jpg";
 
-const UPI_ID = "jyotizalaki@ybl";
-const UPI_NAME = "JYOTI V ZALAKI";
+const UPI_ID = "attendify@ybl";
+const UPI_NAME = "Attendify";
 
 const features = [
   { icon: "all_inclusive", text: "Unlimited subjects" },
@@ -22,9 +22,9 @@ const features = [
 ];
 
 const plans = [
-  { id: "free", name: "Free", price: "₹0", amount: 0, sub: "Forever", desc: "Up to 5 subjects" },
-  { id: "monthly", name: "Pro Monthly", price: "₹49", amount: 49, sub: "per month", desc: "Cancel anytime" },
-  { id: "yearly", name: "Pro Yearly", price: "₹199", amount: 199, sub: "per year · save 66%", desc: "Best value", best: true },
+  { id: "free", name: "Free", price: "₹0", amount: 0, sub: "Forever", desc: "5 subjects only" },
+  { id: "monthly", name: "Pro Monthly", price: "₹149", amount: 149, sub: "per month", desc: "Cancel anytime" },
+  { id: "yearly", name: "Pro Yearly", price: "₹199", amount: 199, sub: "per year · save 88%", desc: "Best value", best: true },
 ];
 
 type PayStage = "idle" | "scan" | "txn" | "processing" | "success";
