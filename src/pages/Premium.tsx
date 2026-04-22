@@ -247,6 +247,8 @@ function PaymentFlow({
   planName,
   txnId,
   setTxnId,
+  proofFile,
+  setProofFile,
   onProceedToTxn,
   onSubmitTxn,
   onBack,
@@ -258,6 +260,16 @@ function PaymentFlow({
   planName: string;
   txnId: string;
   setTxnId: (v: string) => void;
+  proofFile: File | null;
+  setProofFile: (f: File | null) => void;
+  onProceedToTxn: () => void;
+  onSubmitTxn: () => void;
+  onBack: () => void;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const previewUrl = proofFile ? URL.createObjectURL(proofFile) : null;
   onProceedToTxn: () => void;
   onSubmitTxn: () => void;
   onBack: () => void;
