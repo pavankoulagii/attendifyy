@@ -531,13 +531,14 @@ function PaymentFlow({
             <p className="text-xs text-white/70 font-medium">{UPI_NAME} · {UPI_ID}</p>
           </div>
 
-          <div className="relative bg-white rounded-3xl p-5 shadow-glow ring-4 ring-primary/80 max-w-[min(90vw,460px)] w-full aspect-square">
+          <div className="relative bg-white rounded-3xl shadow-glow ring-4 ring-primary/80 max-w-[min(90vw,460px)] w-full aspect-square overflow-hidden">
             {!qrFailed ? (
               <>
                 <img
                   src={upiQr}
                   alt="UPI QR code fullscreen"
-                  className="w-full h-full object-contain block"
+                  className="absolute inset-0 w-full h-full block"
+                  style={{ objectFit: "cover", objectPosition: "center 47%", transform: "scale(1.7)", transformOrigin: "center 47%" }}
                   onError={() => setQrFailed(true)}
                 />
                 <div className="absolute inset-x-6 h-1 rounded-full bg-primary shadow-glow animate-scan-line pointer-events-none" />
