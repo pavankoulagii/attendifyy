@@ -46,6 +46,7 @@ export default function Premium() {
   const [stage, setStage] = useState<PayStage>("idle");
   const [txnId, setTxnId] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofError, setProofError] = useState<string | null>(null);
   const updateProfile = useUpdateProfile();
 
   const selectedPlan = plans.find((p) => p.id === plan)!;
@@ -58,6 +59,7 @@ export default function Premium() {
     }
     setTxnId("");
     setProofFile(null);
+    setProofError(null);
     setStage("scan");
   };
 
@@ -68,15 +70,12 @@ export default function Premium() {
       return;
     }
     if (!proofFile) {
-      toast.error("Please upload a screenshot of the payment success");
+      setProofError("Please upload a screenshot of the payment success");
+      toast.error("Screenshot is required");
       return;
     }
-    if (!proofFile.type.startsWith("image/")) {
-      toast.error("Screenshot must be an image (PNG/JPG)");
-      return;
-    }
-    if (proofFile.size > 5 * 1024 * 1024) {
-      toast.error("Screenshot must be under 5 MB");
+    if (proofError) {
+      toast.error(proofError);
       return;
     }
     if (!user) {
@@ -137,6 +136,8 @@ export default function Premium() {
         setTxnId={setTxnId}
         proofFile={proofFile}
         setProofFile={setProofFile}
+        proofError={proofError}
+        setProofError={setProofError}
         onProceedToTxn={() => setStage("txn")}
         onSubmitTxn={submitTxn}
         onBack={() => setStage(stage === "txn" ? "scan" : "idle")}
@@ -249,6 +250,8 @@ function PaymentFlow({
   setTxnId,
   proofFile,
   setProofFile,
+  proofError,
+  setProofError,
   onProceedToTxn,
   onSubmitTxn,
   onBack,
@@ -262,6 +265,8 @@ function PaymentFlow({
   setTxnId: (v: string) => void;
   proofFile: File | null;
   setProofFile: (f: File | null) => void;
+  proofError: string | null;
+  setProofError: (e: string | null) => void;
   onProceedToTxn: () => void;
   onSubmitTxn: () => void;
   onBack: () => void;
@@ -270,6 +275,53 @@ function PaymentFlow({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const previewUrl = proofFile ? URL.createObjectURL(proofFile) : null;
+  const [qrFullscreen, setQrFullscreen] = useState(false);
+  const [qrFailed, setQrFailed] = useState(false);
+
+  const MIN_DIM = 300; // px
+  const MAX_BYTES = 5 * 1024 * 1024;
+
+  const handleFile = (file: File | null) => {
+    setProofError(null);
+    if (!file) {
+      setProofFile(null);
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setProofError("File must be an image (PNG or JPG)");
+      setProofFile(null);
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setProofError("Image is too large — keep it under 5 MB");
+      setProofFile(null);
+      return;
+    }
+    if (file.size < 5 * 1024) {
+      setProofError("Image looks too small to be a real screenshot");
+      setProofFile(null);
+      return;
+    }
+    // Validate dimensions
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      if (img.width < MIN_DIM || img.height < MIN_DIM) {
+        setProofError(`Screenshot must be at least ${MIN_DIM}×${MIN_DIM}px (yours: ${img.width}×${img.height})`);
+        setProofFile(null);
+        return;
+      }
+      setProofFile(file);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      setProofError("Could not read image — please try a different screenshot");
+      setProofFile(null);
+    };
+    img.src = url;
+  };
+
   return (
     <main className="min-h-[100dvh] px-5 pt-6 pb-12 flex flex-col animate-fade-in overflow-y-auto">
       {/* Header */}
@@ -294,14 +346,23 @@ function PaymentFlow({
         {stage === "scan" && (
           <>
             <div className="bg-card rounded-3xl p-4 shadow-card w-full max-w-xs space-y-3">
-              <div className="rounded-2xl bg-white relative overflow-hidden aspect-square p-2">
+              <button
+                type="button"
+                onClick={() => { setQrFailed(false); setQrFullscreen(true); }}
+                className="rounded-2xl bg-white relative overflow-hidden aspect-square p-2 w-full tap-scale ring-2 ring-primary/40 shadow-glow"
+                aria-label="Open QR fullscreen"
+              >
                 <img
                   src={upiQr}
                   alt="UPI QR code"
                   className="w-full h-full object-contain block"
+                  onError={() => setQrFailed(true)}
                 />
                 <div className="absolute inset-x-4 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line pointer-events-none z-10" />
-              </div>
+                <div className="absolute bottom-2 right-2 h-8 w-8 rounded-full bg-primary text-primary-foreground grid place-items-center shadow-glow">
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>fullscreen</span>
+                </div>
+              </button>
               <div className="text-center space-y-1">
                 <p className="text-xs text-muted-foreground font-medium">Pay to</p>
                 <p className="font-headline font-bold text-base">{UPI_NAME}</p>
@@ -358,21 +419,24 @@ function PaymentFlow({
                 <input
                   ref={fileRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
                   capture="environment"
                   className="hidden"
-                  onChange={(e) => setProofFile(e.target.files?.[0] ?? null)}
+                  onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
                 />
                 {!previewUrl ? (
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    className="w-full h-24 rounded-xl surface-low border-2 border-dashed border-primary/30 grid place-items-center tap-scale"
+                    className={cn(
+                      "w-full h-24 rounded-xl surface-low border-2 border-dashed grid place-items-center tap-scale",
+                      proofError ? "border-destructive/60" : "border-primary/30"
+                    )}
                   >
                     <div className="text-center">
                       <span className="material-symbols-outlined text-primary block" style={{ fontSize: 26 }}>add_photo_alternate</span>
                       <p className="text-xs font-bold text-primary mt-0.5">Upload payment screenshot</p>
-                      <p className="text-[10px] text-muted-foreground font-medium">Required · PNG/JPG · max 5MB</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">Required · PNG/JPG · min 300×300 · max 5MB</p>
                     </div>
                   </button>
                 ) : (
@@ -380,12 +444,18 @@ function PaymentFlow({
                     <img src={previewUrl} alt="Payment screenshot" className="w-full max-h-44 object-contain bg-black/5" />
                     <button
                       type="button"
-                      onClick={() => { setProofFile(null); if (fileRef.current) fileRef.current.value = ""; }}
+                      onClick={() => { setProofFile(null); setProofError(null); if (fileRef.current) fileRef.current.value = ""; }}
                       className="absolute top-2 right-2 h-8 w-8 rounded-full bg-background/90 grid place-items-center shadow-soft tap-scale"
                       aria-label="Remove screenshot"
                     >
                       <span className="material-symbols-outlined text-destructive" style={{ fontSize: 18 }}>close</span>
                     </button>
+                  </div>
+                )}
+                {proofError && (
+                  <div className="flex items-start gap-1.5 text-[11px] text-destructive font-medium">
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>error</span>
+                    <span>{proofError}</span>
                   </div>
                 )}
               </div>
@@ -442,6 +512,60 @@ function PaymentFlow({
           </div>
         )}
       </div>
+
+      {/* Fullscreen QR overlay */}
+      {qrFullscreen && stage === "scan" && (
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 animate-fade-in">
+          <button
+            onClick={() => setQrFullscreen(false)}
+            className="absolute top-5 right-5 h-12 w-12 rounded-full bg-white/10 grid place-items-center text-white tap-scale"
+            aria-label="Close fullscreen QR"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 26 }}>close</span>
+          </button>
+
+          <div className="text-center mb-5">
+            <p className="text-[11px] uppercase tracking-widest font-bold text-primary">Scan to pay</p>
+            <p className="font-headline font-extrabold text-2xl text-white mt-1">{amount}</p>
+            <p className="text-xs text-white/70 font-medium">{UPI_NAME} · {UPI_ID}</p>
+          </div>
+
+          <div className="relative bg-white rounded-3xl p-5 shadow-glow ring-4 ring-primary/80 max-w-[min(90vw,460px)] w-full aspect-square">
+            {!qrFailed ? (
+              <>
+                <img
+                  src={upiQr}
+                  alt="UPI QR code fullscreen"
+                  className="w-full h-full object-contain block"
+                  onError={() => setQrFailed(true)}
+                />
+                <div className="absolute inset-x-6 h-1 rounded-full bg-primary shadow-glow animate-scan-line pointer-events-none" />
+              </>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center p-6">
+                <div className="h-16 w-16 rounded-full bg-destructive/15 grid place-items-center">
+                  <span className="material-symbols-outlined text-destructive" style={{ fontSize: 32 }}>error</span>
+                </div>
+                <p className="font-headline font-bold text-base text-foreground">Couldn't load QR code</p>
+                <p className="text-xs text-muted-foreground font-medium max-w-xs">
+                  Check your connection and try again
+                </p>
+                <Button
+                  onClick={() => { setQrFailed(false); }}
+                  className="h-11 px-6 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>refresh</span>
+                  Try again
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-white/70 font-medium text-center mt-5 max-w-xs">
+            Open any UPI app · GPay, PhonePe, Paytm
+          </p>
+        </div>
+      )}
     </main>
   );
 }
