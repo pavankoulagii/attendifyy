@@ -52,15 +52,6 @@ export default function Auth() {
     if (error) toast.error(error.message);
   };
 
-  const guest = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInAnonymously();
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("Continuing as guest");
-    nav("/app");
-  };
-
   return (
     <div className="min-h-screen mx-auto max-w-md px-6 py-10 flex flex-col surface-bright relative overflow-hidden">
       {/* Decorative gradient blobs */}
