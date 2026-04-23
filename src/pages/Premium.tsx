@@ -419,21 +419,24 @@ function PaymentFlow({
                 <input
                   ref={fileRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
                   capture="environment"
                   className="hidden"
-                  onChange={(e) => setProofFile(e.target.files?.[0] ?? null)}
+                  onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
                 />
                 {!previewUrl ? (
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    className="w-full h-24 rounded-xl surface-low border-2 border-dashed border-primary/30 grid place-items-center tap-scale"
+                    className={cn(
+                      "w-full h-24 rounded-xl surface-low border-2 border-dashed grid place-items-center tap-scale",
+                      proofError ? "border-destructive/60" : "border-primary/30"
+                    )}
                   >
                     <div className="text-center">
                       <span className="material-symbols-outlined text-primary block" style={{ fontSize: 26 }}>add_photo_alternate</span>
                       <p className="text-xs font-bold text-primary mt-0.5">Upload payment screenshot</p>
-                      <p className="text-[10px] text-muted-foreground font-medium">Required · PNG/JPG · max 5MB</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">Required · PNG/JPG · min 300×300 · max 5MB</p>
                     </div>
                   </button>
                 ) : (
@@ -441,12 +444,18 @@ function PaymentFlow({
                     <img src={previewUrl} alt="Payment screenshot" className="w-full max-h-44 object-contain bg-black/5" />
                     <button
                       type="button"
-                      onClick={() => { setProofFile(null); if (fileRef.current) fileRef.current.value = ""; }}
+                      onClick={() => { setProofFile(null); setProofError(null); if (fileRef.current) fileRef.current.value = ""; }}
                       className="absolute top-2 right-2 h-8 w-8 rounded-full bg-background/90 grid place-items-center shadow-soft tap-scale"
                       aria-label="Remove screenshot"
                     >
                       <span className="material-symbols-outlined text-destructive" style={{ fontSize: 18 }}>close</span>
                     </button>
+                  </div>
+                )}
+                {proofError && (
+                  <div className="flex items-start gap-1.5 text-[11px] text-destructive font-medium">
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>error</span>
+                    <span>{proofError}</span>
                   </div>
                 )}
               </div>
