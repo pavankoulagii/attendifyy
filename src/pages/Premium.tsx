@@ -349,14 +349,13 @@ function PaymentFlow({
               <button
                 type="button"
                 onClick={() => { setQrFailed(false); setQrFullscreen(true); }}
-                className="rounded-2xl bg-white relative overflow-hidden aspect-square w-full tap-scale ring-2 ring-primary/40 shadow-glow"
+                className="qr-frame rounded-2xl bg-white relative overflow-hidden aspect-square w-full tap-scale ring-2 ring-primary/40 shadow-glow"
                 aria-label="Open QR fullscreen"
               >
                 <img
                   src={upiQr}
                   alt="UPI QR code"
-                  className="absolute inset-0 w-full h-full block"
-                  style={{ objectFit: "cover", objectPosition: "center 47%", transform: "scale(1.7)", transformOrigin: "center 47%" }}
+                  className="qr-img"
                   onError={() => setQrFailed(true)}
                 />
                 <div className="absolute inset-x-4 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line pointer-events-none z-10" />
