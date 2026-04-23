@@ -346,14 +346,23 @@ function PaymentFlow({
         {stage === "scan" && (
           <>
             <div className="bg-card rounded-3xl p-4 shadow-card w-full max-w-xs space-y-3">
-              <div className="rounded-2xl bg-white relative overflow-hidden aspect-square p-2">
+              <button
+                type="button"
+                onClick={() => { setQrFailed(false); setQrFullscreen(true); }}
+                className="rounded-2xl bg-white relative overflow-hidden aspect-square p-2 w-full tap-scale ring-2 ring-primary/40 shadow-glow"
+                aria-label="Open QR fullscreen"
+              >
                 <img
                   src={upiQr}
                   alt="UPI QR code"
                   className="w-full h-full object-contain block"
+                  onError={() => setQrFailed(true)}
                 />
                 <div className="absolute inset-x-4 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line pointer-events-none z-10" />
-              </div>
+                <div className="absolute bottom-2 right-2 h-8 w-8 rounded-full bg-primary text-primary-foreground grid place-items-center shadow-glow">
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>fullscreen</span>
+                </div>
+              </button>
               <div className="text-center space-y-1">
                 <p className="text-xs text-muted-foreground font-medium">Pay to</p>
                 <p className="font-headline font-bold text-base">{UPI_NAME}</p>
