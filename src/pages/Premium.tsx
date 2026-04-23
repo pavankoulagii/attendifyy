@@ -70,15 +70,12 @@ export default function Premium() {
       return;
     }
     if (!proofFile) {
-      toast.error("Please upload a screenshot of the payment success");
+      setProofError("Please upload a screenshot of the payment success");
+      toast.error("Screenshot is required");
       return;
     }
-    if (!proofFile.type.startsWith("image/")) {
-      toast.error("Screenshot must be an image (PNG/JPG)");
-      return;
-    }
-    if (proofFile.size > 5 * 1024 * 1024) {
-      toast.error("Screenshot must be under 5 MB");
+    if (proofError) {
+      toast.error(proofError);
       return;
     }
     if (!user) {
