@@ -46,6 +46,7 @@ export default function Premium() {
   const [stage, setStage] = useState<PayStage>("idle");
   const [txnId, setTxnId] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofError, setProofError] = useState<string | null>(null);
   const updateProfile = useUpdateProfile();
 
   const selectedPlan = plans.find((p) => p.id === plan)!;
@@ -58,6 +59,7 @@ export default function Premium() {
     }
     setTxnId("");
     setProofFile(null);
+    setProofError(null);
     setStage("scan");
   };
 
