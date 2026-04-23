@@ -136,6 +136,8 @@ export default function Premium() {
         setTxnId={setTxnId}
         proofFile={proofFile}
         setProofFile={setProofFile}
+        proofError={proofError}
+        setProofError={setProofError}
         onProceedToTxn={() => setStage("txn")}
         onSubmitTxn={submitTxn}
         onBack={() => setStage(stage === "txn" ? "scan" : "idle")}
