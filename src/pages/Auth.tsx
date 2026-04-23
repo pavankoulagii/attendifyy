@@ -154,17 +154,6 @@ export default function Auth() {
           </svg>
           Continue with Google
         </Button>
-
-        <Button
-          type="button"
-          onClick={guest}
-          variant="ghost"
-          disabled={loading}
-          className="w-full h-12 rounded-2xl surface-low hover:bg-surface-mid text-primary tap-scale font-headline font-bold border-0"
-        >
-          <span className="material-symbols-outlined mr-2" style={{ fontSize: 20 }}>person</span>
-          Continue as Guest
-        </Button>
       </div>
 
       <p className="relative text-center text-[11px] text-muted-foreground mt-6 px-6 font-medium">
