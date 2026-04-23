@@ -512,6 +512,60 @@ function PaymentFlow({
           </div>
         )}
       </div>
+
+      {/* Fullscreen QR overlay */}
+      {qrFullscreen && stage === "scan" && (
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 animate-fade-in">
+          <button
+            onClick={() => setQrFullscreen(false)}
+            className="absolute top-5 right-5 h-12 w-12 rounded-full bg-white/10 grid place-items-center text-white tap-scale"
+            aria-label="Close fullscreen QR"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 26 }}>close</span>
+          </button>
+
+          <div className="text-center mb-5">
+            <p className="text-[11px] uppercase tracking-widest font-bold text-primary">Scan to pay</p>
+            <p className="font-headline font-extrabold text-2xl text-white mt-1">{amount}</p>
+            <p className="text-xs text-white/70 font-medium">{UPI_NAME} · {UPI_ID}</p>
+          </div>
+
+          <div className="relative bg-white rounded-3xl p-5 shadow-glow ring-4 ring-primary/80 max-w-[min(90vw,460px)] w-full aspect-square">
+            {!qrFailed ? (
+              <>
+                <img
+                  src={upiQr}
+                  alt="UPI QR code fullscreen"
+                  className="w-full h-full object-contain block"
+                  onError={() => setQrFailed(true)}
+                />
+                <div className="absolute inset-x-6 h-1 rounded-full bg-primary shadow-glow animate-scan-line pointer-events-none" />
+              </>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center p-6">
+                <div className="h-16 w-16 rounded-full bg-destructive/15 grid place-items-center">
+                  <span className="material-symbols-outlined text-destructive" style={{ fontSize: 32 }}>error</span>
+                </div>
+                <p className="font-headline font-bold text-base text-foreground">Couldn't load QR code</p>
+                <p className="text-xs text-muted-foreground font-medium max-w-xs">
+                  Check your connection and try again
+                </p>
+                <Button
+                  onClick={() => { setQrFailed(false); }}
+                  className="h-11 px-6 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>refresh</span>
+                  Try again
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-white/70 font-medium text-center mt-5 max-w-xs">
+            Open any UPI app · GPay, PhonePe, Paytm
+          </p>
+        </div>
+      )}
     </main>
   );
 }
