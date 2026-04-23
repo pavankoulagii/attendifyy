@@ -250,6 +250,8 @@ function PaymentFlow({
   setTxnId,
   proofFile,
   setProofFile,
+  proofError,
+  setProofError,
   onProceedToTxn,
   onSubmitTxn,
   onBack,
@@ -263,6 +265,8 @@ function PaymentFlow({
   setTxnId: (v: string) => void;
   proofFile: File | null;
   setProofFile: (f: File | null) => void;
+  proofError: string | null;
+  setProofError: (e: string | null) => void;
   onProceedToTxn: () => void;
   onSubmitTxn: () => void;
   onBack: () => void;
@@ -271,6 +275,53 @@ function PaymentFlow({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const previewUrl = proofFile ? URL.createObjectURL(proofFile) : null;
+  const [qrFullscreen, setQrFullscreen] = useState(false);
+  const [qrFailed, setQrFailed] = useState(false);
+
+  const MIN_DIM = 300; // px
+  const MAX_BYTES = 5 * 1024 * 1024;
+
+  const handleFile = (file: File | null) => {
+    setProofError(null);
+    if (!file) {
+      setProofFile(null);
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setProofError("File must be an image (PNG or JPG)");
+      setProofFile(null);
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setProofError("Image is too large — keep it under 5 MB");
+      setProofFile(null);
+      return;
+    }
+    if (file.size < 5 * 1024) {
+      setProofError("Image looks too small to be a real screenshot");
+      setProofFile(null);
+      return;
+    }
+    // Validate dimensions
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      if (img.width < MIN_DIM || img.height < MIN_DIM) {
+        setProofError(`Screenshot must be at least ${MIN_DIM}×${MIN_DIM}px (yours: ${img.width}×${img.height})`);
+        setProofFile(null);
+        return;
+      }
+      setProofFile(file);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      setProofError("Could not read image — please try a different screenshot");
+      setProofFile(null);
+    };
+    img.src = url;
+  };
+
   return (
     <main className="min-h-[100dvh] px-5 pt-6 pb-12 flex flex-col animate-fade-in overflow-y-auto">
       {/* Header */}
