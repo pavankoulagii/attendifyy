@@ -294,12 +294,11 @@ function PaymentFlow({
         {stage === "scan" && (
           <>
             <div className="bg-card rounded-3xl p-4 shadow-card w-full max-w-xs space-y-3">
-              <div className="rounded-2xl bg-white relative overflow-hidden aspect-square">
+              <div className="rounded-2xl bg-white relative overflow-hidden aspect-square p-2">
                 <img
                   src={upiQr}
                   alt="UPI QR code"
-                  className="absolute inset-0 w-full h-full block"
-                  style={{ objectFit: "cover", objectPosition: "center 47%", transform: "scale(2.1)", transformOrigin: "center 47%" }}
+                  className="w-full h-full object-contain block"
                 />
                 <div className="absolute inset-x-4 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line pointer-events-none z-10" />
               </div>
