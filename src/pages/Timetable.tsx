@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useMarkAttendance, useSubjects, type Subject } from "@/lib/data";
-import { useClassPeriods, fmtTime } from "@/lib/periods";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useMarkAttendance, useSubjects, useProfile, type Subject } from "@/lib/data";
+import { useClassPeriods, useClearTimetable, TIMETABLE_TTL_MS, fmtTime } from "@/lib/periods";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { percent, healthStatus } from "@/lib/attendance";
+import { Button } from "@/components/ui/button";
 
 const DAYS = [
   { short: "S", long: "Sun" },
@@ -17,10 +18,31 @@ const DAYS = [
 ];
 
 export default function Timetable() {
+  const nav = useNavigate();
   const { data: subjects = [] } = useSubjects();
   const { data: periods = [] } = useClassPeriods();
+  const { data: profile } = useProfile();
+  const clearMut = useClearTimetable();
   const [day, setDay] = useState<number>(new Date().getDay());
   const mark = useMarkAttendance();
+
+  // Weekly expiry: timetable auto-clears after 7 days from upload
+  const uploadedAt = (profile as any)?.timetable_uploaded_at
+    ? new Date((profile as any).timetable_uploaded_at).getTime()
+    : null;
+  const hasAnySchedule = periods.length > 0 || subjects.length > 0;
+  const isExpired = !!uploadedAt && Date.now() - uploadedAt > TIMETABLE_TTL_MS;
+  const daysLeft = uploadedAt
+    ? Math.max(0, Math.ceil((uploadedAt + TIMETABLE_TTL_MS - Date.now()) / (24 * 60 * 60 * 1000)))
+    : 0;
+
+  useEffect(() => {
+    if (isExpired && hasAnySchedule && !clearMut.isPending) {
+      clearMut.mutate(undefined, {
+        onSuccess: () => toast.info("Your weekly timetable expired. Please upload a new one."),
+      });
+    }
+  }, [isExpired, hasAnySchedule]);
 
   const subjectsById = new Map(subjects.map((s) => [s.id, s]));
 
