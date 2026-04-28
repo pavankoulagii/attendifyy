@@ -128,13 +128,21 @@ export default function Timetable() {
               : "Tap a class to mark attendance"}
           </p>
         </div>
-        <Link to="/app/subjects/new">
-          <button className="h-11 px-4 rounded-2xl gradient-primary text-white shadow-glow tap-scale flex items-center gap-1.5">
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add_a_photo</span>
-            <span className="text-xs font-headline font-bold">Scan</span>
-          </button>
-        </Link>
+        <button
+          onClick={triggerUpload}
+          className="h-11 px-4 rounded-2xl gradient-primary text-white shadow-glow tap-scale flex items-center gap-1.5"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add_a_photo</span>
+          <span className="text-xs font-headline font-bold">Replace</span>
+        </button>
       </header>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => e.target.files?.[0] && onPickReplacement(e.target.files[0])}
+      />
 
       {uploadedAt && hasAnySchedule && (
         <div className={cn(
