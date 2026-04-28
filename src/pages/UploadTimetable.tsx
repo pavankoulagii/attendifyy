@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,8 @@ type Stage = "upload" | "extracting" | "review";
 
 export default function UploadTimetable() {
   const nav = useNavigate();
+  const [params] = useSearchParams();
+  const replaceMode = params.get("replace") === "1";
   const fileRef = useRef<HTMLInputElement>(null);
   const [stage, setStage] = useState<Stage>("upload");
   const [preview, setPreview] = useState<string | null>(null);
@@ -71,13 +73,28 @@ export default function UploadTimetable() {
     const valid = extracted.filter((s) => s.name.trim() && s.periods.length > 0);
     if (valid.length === 0) return toast.error("Nothing to save");
     try {
-      await importMut.mutateAsync(valid);
-      toast.success(`Imported ${valid.length} subjects`);
-      nav("/app/subjects");
+      await importMut.mutateAsync({ subjects: valid, replace: replaceMode });
+      toast.success(replaceMode ? `New week imported · ${valid.length} subjects` : `Imported ${valid.length} subjects`);
+      nav("/app/timetable");
     } catch (err: any) {
       toast.error(err.message || "Save failed");
     }
   };
+
+  // Auto-trigger flow: an image was queued from the Timetable "Upload new" tap
+  useEffect(() => {
+    const queued = sessionStorage.getItem("queuedTimetableImage");
+    if (!queued) return;
+    sessionStorage.removeItem("queuedTimetableImage");
+    fetch(queued)
+      .then((r) => r.blob())
+      .then((blob) => {
+        const file = new File([blob], "timetable.jpg", { type: blob.type || "image/jpeg" });
+        handleFile(file);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <main className="px-5 pt-6 pb-32 animate-fade-in">

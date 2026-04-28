@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMarkAttendance, useSubjects, useProfile, type Subject } from "@/lib/data";
 import { useClassPeriods, useClearTimetable, TIMETABLE_TTL_MS, fmtTime } from "@/lib/periods";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,20 @@ export default function Timetable() {
   const clearMut = useClearTimetable();
   const [day, setDay] = useState<number>(new Date().getDay());
   const mark = useMarkAttendance();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const onPickReplacement = (file: File) => {
+    if (!file.type.startsWith("image/")) return toast.error("Please select an image");
+    if (file.size > 8 * 1024 * 1024) return toast.error("Image too large (max 8MB)");
+    const reader = new FileReader();
+    reader.onload = () => {
+      sessionStorage.setItem("queuedTimetableImage", reader.result as string);
+      nav("/app/subjects/new?replace=1");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const triggerUpload = () => fileRef.current?.click();
 
   // Weekly expiry: timetable auto-clears after 7 days from upload
   const uploadedAt = (profile as any)?.timetable_uploaded_at
@@ -79,12 +93,25 @@ export default function Timetable() {
             </p>
           </div>
           <Button
-            onClick={() => nav("/app/subjects/new")}
+            onClick={triggerUpload}
             className="w-full h-14 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined ms-fill" style={{ fontSize: 22 }}>add_a_photo</span>
             Upload new timetable
           </Button>
+          <button
+            onClick={() => nav("/app/subjects/new?replace=1")}
+            className="text-xs font-headline font-bold text-muted-foreground underline tap-scale"
+          >
+            Or enter manually
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => e.target.files?.[0] && onPickReplacement(e.target.files[0])}
+          />
         </div>
       </main>
     );
@@ -101,13 +128,21 @@ export default function Timetable() {
               : "Tap a class to mark attendance"}
           </p>
         </div>
-        <Link to="/app/subjects/new">
-          <button className="h-11 px-4 rounded-2xl gradient-primary text-white shadow-glow tap-scale flex items-center gap-1.5">
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add_a_photo</span>
-            <span className="text-xs font-headline font-bold">Scan</span>
-          </button>
-        </Link>
+        <button
+          onClick={triggerUpload}
+          className="h-11 px-4 rounded-2xl gradient-primary text-white shadow-glow tap-scale flex items-center gap-1.5"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add_a_photo</span>
+          <span className="text-xs font-headline font-bold">Replace</span>
+        </button>
       </header>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => e.target.files?.[0] && onPickReplacement(e.target.files[0])}
+      />
 
       {uploadedAt && hasAnySchedule && (
         <div className={cn(
@@ -122,7 +157,7 @@ export default function Timetable() {
           </p>
           {daysLeft <= 2 && (
             <button
-              onClick={() => nav("/app/subjects/new")}
+              onClick={triggerUpload}
               className="text-[11px] font-headline font-bold underline tap-scale"
             >
               Renew
