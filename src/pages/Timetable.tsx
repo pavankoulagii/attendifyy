@@ -109,6 +109,28 @@ export default function Timetable() {
         </Link>
       </header>
 
+      {uploadedAt && hasAnySchedule && (
+        <div className={cn(
+          "rounded-2xl px-4 py-3 flex items-center gap-3 shadow-soft",
+          daysLeft <= 2 ? "bg-destructive-container text-destructive-container-foreground" : "surface-low"
+        )}>
+          <span className="material-symbols-outlined ms-fill" style={{ fontSize: 20 }}>event_repeat</span>
+          <p className="text-xs font-headline font-bold flex-1">
+            {daysLeft === 0
+              ? "Expires today — upload a new timetable"
+              : `Weekly timetable · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}
+          </p>
+          {daysLeft <= 2 && (
+            <button
+              onClick={() => nav("/app/subjects/new")}
+              className="text-[11px] font-headline font-bold underline tap-scale"
+            >
+              Renew
+            </button>
+          )}
+        </div>
+      )}
+
       <section className="grid grid-cols-7 gap-2">
         {DAYS.map((d, i) => {
           const active = day === i;
