@@ -157,7 +157,7 @@ export default function Timetable() {
           </p>
           {daysLeft <= 2 && (
             <button
-              onClick={() => nav("/app/subjects/new")}
+              onClick={triggerUpload}
               className="text-[11px] font-headline font-bold underline tap-scale"
             >
               Renew
