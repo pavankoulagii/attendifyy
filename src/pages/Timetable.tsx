@@ -93,12 +93,25 @@ export default function Timetable() {
             </p>
           </div>
           <Button
-            onClick={() => nav("/app/subjects/new")}
+            onClick={triggerUpload}
             className="w-full h-14 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined ms-fill" style={{ fontSize: 22 }}>add_a_photo</span>
             Upload new timetable
           </Button>
+          <button
+            onClick={() => nav("/app/subjects/new?replace=1")}
+            className="text-xs font-headline font-bold text-muted-foreground underline tap-scale"
+          >
+            Or enter manually
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => e.target.files?.[0] && onPickReplacement(e.target.files[0])}
+          />
         </div>
       </main>
     );
