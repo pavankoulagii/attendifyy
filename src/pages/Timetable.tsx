@@ -25,6 +25,20 @@ export default function Timetable() {
   const clearMut = useClearTimetable();
   const [day, setDay] = useState<number>(new Date().getDay());
   const mark = useMarkAttendance();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const onPickReplacement = (file: File) => {
+    if (!file.type.startsWith("image/")) return toast.error("Please select an image");
+    if (file.size > 8 * 1024 * 1024) return toast.error("Image too large (max 8MB)");
+    const reader = new FileReader();
+    reader.onload = () => {
+      sessionStorage.setItem("queuedTimetableImage", reader.result as string);
+      nav("/app/subjects/new?replace=1");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const triggerUpload = () => fileRef.current?.click();
 
   // Weekly expiry: timetable auto-clears after 7 days from upload
   const uploadedAt = (profile as any)?.timetable_uploaded_at
