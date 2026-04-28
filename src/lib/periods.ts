@@ -80,8 +80,16 @@ export function useImportTimetable() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async (subjects: ExtractedSubject[]) => {
+    mutationFn: async ({ subjects, replace = false }: { subjects: ExtractedSubject[]; replace?: boolean }) => {
       if (!user) throw new Error("not authed");
+
+      // Replace mode: wipe old timetable first so the new week starts clean
+      if (replace) {
+        const { error: pErr } = await supabase.from("class_periods").delete().eq("user_id", user.id);
+        if (pErr) throw pErr;
+        const { error: sErr } = await supabase.from("subjects").delete().eq("user_id", user.id);
+        if (sErr) throw sErr;
+      }
 
       // Stamp the weekly upload timestamp so we can auto-expire after 7 days
       await supabase
