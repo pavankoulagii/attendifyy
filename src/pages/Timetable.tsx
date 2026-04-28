@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useMarkAttendance, useSubjects, type Subject } from "@/lib/data";
-import { useClassPeriods, fmtTime } from "@/lib/periods";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useMarkAttendance, useSubjects, useProfile, type Subject } from "@/lib/data";
+import { useClassPeriods, useClearTimetable, TIMETABLE_TTL_MS, fmtTime } from "@/lib/periods";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { percent, healthStatus } from "@/lib/attendance";
+import { Button } from "@/components/ui/button";
 
 const DAYS = [
   { short: "S", long: "Sun" },
@@ -17,10 +18,31 @@ const DAYS = [
 ];
 
 export default function Timetable() {
+  const nav = useNavigate();
   const { data: subjects = [] } = useSubjects();
   const { data: periods = [] } = useClassPeriods();
+  const { data: profile } = useProfile();
+  const clearMut = useClearTimetable();
   const [day, setDay] = useState<number>(new Date().getDay());
   const mark = useMarkAttendance();
+
+  // Weekly expiry: timetable auto-clears after 7 days from upload
+  const uploadedAt = (profile as any)?.timetable_uploaded_at
+    ? new Date((profile as any).timetable_uploaded_at).getTime()
+    : null;
+  const hasAnySchedule = periods.length > 0 || subjects.length > 0;
+  const isExpired = !!uploadedAt && Date.now() - uploadedAt > TIMETABLE_TTL_MS;
+  const daysLeft = uploadedAt
+    ? Math.max(0, Math.ceil((uploadedAt + TIMETABLE_TTL_MS - Date.now()) / (24 * 60 * 60 * 1000)))
+    : 0;
+
+  useEffect(() => {
+    if (isExpired && hasAnySchedule && !clearMut.isPending) {
+      clearMut.mutate(undefined, {
+        onSuccess: () => toast.info("Your weekly timetable expired. Please upload a new one."),
+      });
+    }
+  }, [isExpired, hasAnySchedule]);
 
   const subjectsById = new Map(subjects.map((s) => [s.id, s]));
 
@@ -38,6 +60,35 @@ export default function Timetable() {
   );
 
   const isEmpty = todayPeriods.length === 0 && fallback.length === 0;
+
+  // Expired + nothing left to show → dedicated upload prompt
+  if (isExpired && !hasAnySchedule) {
+    return (
+      <main className="px-5 pt-6 pb-8 space-y-6 animate-fade-in">
+        <header>
+          <h1 className="font-headline font-extrabold text-3xl tracking-tight">Timetable</h1>
+        </header>
+        <div className="bg-card rounded-3xl p-8 shadow-card text-center space-y-4">
+          <div className="inline-grid h-16 w-16 rounded-2xl gradient-primary shadow-glow place-items-center mx-auto">
+            <span className="material-symbols-outlined ms-fill text-white" style={{ fontSize: 32 }}>event_repeat</span>
+          </div>
+          <div className="space-y-1">
+            <p className="font-headline font-extrabold text-xl">This week's timetable expired</p>
+            <p className="text-sm text-muted-foreground font-medium max-w-xs mx-auto">
+              Timetables refresh every 7 days. Upload your timetable for the new week to continue tracking.
+            </p>
+          </div>
+          <Button
+            onClick={() => nav("/app/subjects/new")}
+            className="w-full h-14 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined ms-fill" style={{ fontSize: 22 }}>add_a_photo</span>
+            Upload new timetable
+          </Button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="px-5 pt-6 pb-8 space-y-6 animate-fade-in">
@@ -57,6 +108,28 @@ export default function Timetable() {
           </button>
         </Link>
       </header>
+
+      {uploadedAt && hasAnySchedule && (
+        <div className={cn(
+          "rounded-2xl px-4 py-3 flex items-center gap-3 shadow-soft",
+          daysLeft <= 2 ? "bg-destructive-container text-destructive-container-foreground" : "surface-low"
+        )}>
+          <span className="material-symbols-outlined ms-fill" style={{ fontSize: 20 }}>event_repeat</span>
+          <p className="text-xs font-headline font-bold flex-1">
+            {daysLeft === 0
+              ? "Expires today — upload a new timetable"
+              : `Weekly timetable · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}
+          </p>
+          {daysLeft <= 2 && (
+            <button
+              onClick={() => nav("/app/subjects/new")}
+              className="text-[11px] font-headline font-bold underline tap-scale"
+            >
+              Renew
+            </button>
+          )}
+        </div>
+      )}
 
       <section className="grid grid-cols-7 gap-2">
         {DAYS.map((d, i) => {

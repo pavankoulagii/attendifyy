@@ -83,6 +83,12 @@ export function useImportTimetable() {
     mutationFn: async (subjects: ExtractedSubject[]) => {
       if (!user) throw new Error("not authed");
 
+      // Stamp the weekly upload timestamp so we can auto-expire after 7 days
+      await supabase
+        .from("profiles")
+        .update({ timetable_uploaded_at: new Date().toISOString() } as any)
+        .eq("user_id", user.id);
+
       for (let i = 0; i < subjects.length; i++) {
         const s = subjects[i];
         const days = Array.from(new Set(s.periods.map((p) => p.day_of_week)));
@@ -116,6 +122,33 @@ export function useImportTimetable() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["subjects"] });
       qc.invalidateQueries({ queryKey: ["periods"] });
+    },
+  });
+}
+
+// Weekly timetable TTL — 7 days from last upload
+export const TIMETABLE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function useClearTimetable() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error("not authed");
+      const { error: pErr } = await supabase.from("class_periods").delete().eq("user_id", user.id);
+      if (pErr) throw pErr;
+      const { error: sErr } = await supabase.from("subjects").delete().eq("user_id", user.id);
+      if (sErr) throw sErr;
+      const { error: upErr } = await supabase
+        .from("profiles")
+        .update({ timetable_uploaded_at: null } as any)
+        .eq("user_id", user.id);
+      if (upErr) throw upErr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["subjects"] });
+      qc.invalidateQueries({ queryKey: ["periods"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
     },
   });
 }

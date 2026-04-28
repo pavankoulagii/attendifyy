@@ -103,6 +103,7 @@ export type Database = {
           premium_plan: string | null
           required_attendance: number
           semester: string | null
+          timetable_uploaded_at: string | null
           updated_at: string
           upi_txn_id: string | null
           user_id: string
@@ -119,6 +120,7 @@ export type Database = {
           premium_plan?: string | null
           required_attendance?: number
           semester?: string | null
+          timetable_uploaded_at?: string | null
           updated_at?: string
           upi_txn_id?: string | null
           user_id: string
@@ -135,6 +137,7 @@ export type Database = {
           premium_plan?: string | null
           required_attendance?: number
           semester?: string | null
+          timetable_uploaded_at?: string | null
           updated_at?: string
           upi_txn_id?: string | null
           user_id?: string
