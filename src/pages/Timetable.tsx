@@ -61,6 +61,35 @@ export default function Timetable() {
 
   const isEmpty = todayPeriods.length === 0 && fallback.length === 0;
 
+  // Expired + nothing left to show → dedicated upload prompt
+  if (isExpired && !hasAnySchedule) {
+    return (
+      <main className="px-5 pt-6 pb-8 space-y-6 animate-fade-in">
+        <header>
+          <h1 className="font-headline font-extrabold text-3xl tracking-tight">Timetable</h1>
+        </header>
+        <div className="bg-card rounded-3xl p-8 shadow-card text-center space-y-4">
+          <div className="inline-grid h-16 w-16 rounded-2xl gradient-primary shadow-glow place-items-center mx-auto">
+            <span className="material-symbols-outlined ms-fill text-white" style={{ fontSize: 32 }}>event_repeat</span>
+          </div>
+          <div className="space-y-1">
+            <p className="font-headline font-extrabold text-xl">This week's timetable expired</p>
+            <p className="text-sm text-muted-foreground font-medium max-w-xs mx-auto">
+              Timetables refresh every 7 days. Upload your timetable for the new week to continue tracking.
+            </p>
+          </div>
+          <Button
+            onClick={() => nav("/app/subjects/new")}
+            className="w-full h-14 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined ms-fill" style={{ fontSize: 22 }}>add_a_photo</span>
+            Upload new timetable
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="px-5 pt-6 pb-8 space-y-6 animate-fade-in">
       <header className="flex items-end justify-between">
