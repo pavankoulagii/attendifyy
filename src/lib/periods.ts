@@ -126,6 +126,33 @@ export function useImportTimetable() {
   });
 }
 
+// Weekly timetable TTL — 7 days from last upload
+export const TIMETABLE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function useClearTimetable() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error("not authed");
+      const { error: pErr } = await supabase.from("class_periods").delete().eq("user_id", user.id);
+      if (pErr) throw pErr;
+      const { error: sErr } = await supabase.from("subjects").delete().eq("user_id", user.id);
+      if (sErr) throw sErr;
+      const { error: upErr } = await supabase
+        .from("profiles")
+        .update({ timetable_uploaded_at: null } as any)
+        .eq("user_id", user.id);
+      if (upErr) throw upErr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["subjects"] });
+      qc.invalidateQueries({ queryKey: ["periods"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+}
+
 function normalizeTime(t: string): string {
   // Ensure HH:MM:SS
   if (/^\d{2}:\d{2}$/.test(t)) return t + ":00";
