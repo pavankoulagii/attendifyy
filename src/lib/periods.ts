@@ -143,6 +143,9 @@ export function useClearTimetable() {
   return useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("not authed");
+      // Wipe attendance history first so the calendar is clean for the new week
+      const { error: aErr } = await supabase.from("attendance_logs").delete().eq("user_id", user.id);
+      if (aErr) throw aErr;
       const { error: pErr } = await supabase.from("class_periods").delete().eq("user_id", user.id);
       if (pErr) throw pErr;
       const { error: sErr } = await supabase.from("subjects").delete().eq("user_id", user.id);
@@ -157,6 +160,8 @@ export function useClearTimetable() {
       qc.invalidateQueries({ queryKey: ["subjects"] });
       qc.invalidateQueries({ queryKey: ["periods"] });
       qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["attendance"] });
+      qc.invalidateQueries({ queryKey: ["logs"] });
     },
   });
 }
