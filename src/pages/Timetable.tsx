@@ -44,10 +44,16 @@ export default function Timetable() {
   const uploadedAt = (profile as any)?.timetable_uploaded_at
     ? new Date((profile as any).timetable_uploaded_at).getTime()
     : null;
+  const legacyStartedAt = subjects.length > 0
+    ? Math.min(...subjects.map((s) => new Date(s.created_at).getTime()).filter(Number.isFinite))
+    : null;
+  const timetableStartedAt = uploadedAt ?? legacyStartedAt;
   const hasAnySchedule = periods.length > 0 || subjects.length > 0;
-  const isExpired = !!uploadedAt && Date.now() - uploadedAt > TIMETABLE_TTL_MS;
-  const daysLeft = uploadedAt
-    ? Math.max(0, Math.ceil((uploadedAt + TIMETABLE_TTL_MS - Date.now()) / (24 * 60 * 60 * 1000)))
+  const isExpired = !!timetableStartedAt && Date.now() - timetableStartedAt > TIMETABLE_TTL_MS;
+  const visiblePeriods = isExpired ? [] : periods;
+  const visibleSubjects = isExpired ? [] : subjects;
+  const daysLeft = timetableStartedAt
+    ? Math.max(0, Math.ceil((timetableStartedAt + TIMETABLE_TTL_MS - Date.now()) / (24 * 60 * 60 * 1000)))
     : 0;
 
   useEffect(() => {
@@ -58,25 +64,25 @@ export default function Timetable() {
     }
   }, [isExpired, hasAnySchedule]);
 
-  const subjectsById = new Map(subjects.map((s) => [s.id, s]));
+  const subjectsById = new Map(visibleSubjects.map((s) => [s.id, s]));
 
   // Periods scheduled for selected day, sorted by start_time
-  const todayPeriods = periods
+  const todayPeriods = visiblePeriods
     .filter((p) => p.day_of_week === day)
     .sort((a, b) => a.start_time.localeCompare(b.start_time));
 
   // Fallback for subjects without periods (legacy weekly_schedule)
-  const fallback = subjects.filter(
+  const fallback = visibleSubjects.filter(
     (s) =>
       Array.isArray(s.weekly_schedule) &&
       (s.weekly_schedule as number[]).includes(day) &&
-      !periods.some((p) => p.subject_id === s.id),
+      !visiblePeriods.some((p) => p.subject_id === s.id),
   );
 
   const isEmpty = todayPeriods.length === 0 && fallback.length === 0;
 
   // Expired + nothing left to show → dedicated upload prompt
-  if (isExpired && !hasAnySchedule) {
+  if (isExpired) {
     return (
       <main className="px-5 pt-6 pb-8 space-y-6 animate-fade-in">
         <header>
@@ -144,7 +150,7 @@ export default function Timetable() {
         onChange={(e) => e.target.files?.[0] && onPickReplacement(e.target.files[0])}
       />
 
-      {uploadedAt && hasAnySchedule && (
+      {timetableStartedAt && hasAnySchedule && !isExpired && (
         <div className={cn(
           "rounded-2xl px-4 py-3 flex items-center gap-3 shadow-soft",
           daysLeft <= 2 ? "bg-destructive-container text-destructive-container-foreground" : "surface-low"
