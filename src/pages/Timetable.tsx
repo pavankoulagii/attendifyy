@@ -22,7 +22,7 @@ export default function Timetable() {
   const { data: subjects = [] } = useSubjects();
   const { data: periods = [] } = useClassPeriods();
   const { data: profile } = useProfile();
-  const clearMut = useClearTimetable();
+  const { mutate: clearTimetable, isPending: isClearingTimetable } = useClearTimetable();
   const [day, setDay] = useState<number>(new Date().getDay());
   const mark = useMarkAttendance();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -41,42 +41,49 @@ export default function Timetable() {
   const triggerUpload = () => fileRef.current?.click();
 
   // Weekly expiry: timetable auto-clears after 7 days from upload
-  const uploadedAt = (profile as any)?.timetable_uploaded_at
-    ? new Date((profile as any).timetable_uploaded_at).getTime()
+  const timetableUploadedAt = (profile as { timetable_uploaded_at?: string | null } | null)?.timetable_uploaded_at;
+  const uploadedAt = timetableUploadedAt
+    ? new Date(timetableUploadedAt).getTime()
     : null;
+  const legacyStartedAt = subjects.length > 0
+    ? Math.min(...subjects.map((s) => new Date(s.created_at).getTime()).filter(Number.isFinite))
+    : null;
+  const timetableStartedAt = uploadedAt ?? legacyStartedAt;
   const hasAnySchedule = periods.length > 0 || subjects.length > 0;
-  const isExpired = !!uploadedAt && Date.now() - uploadedAt > TIMETABLE_TTL_MS;
-  const daysLeft = uploadedAt
-    ? Math.max(0, Math.ceil((uploadedAt + TIMETABLE_TTL_MS - Date.now()) / (24 * 60 * 60 * 1000)))
+  const isExpired = !!timetableStartedAt && Date.now() - timetableStartedAt > TIMETABLE_TTL_MS;
+  const visiblePeriods = isExpired ? [] : periods;
+  const visibleSubjects = isExpired ? [] : subjects;
+  const daysLeft = timetableStartedAt
+    ? Math.max(0, Math.ceil((timetableStartedAt + TIMETABLE_TTL_MS - Date.now()) / (24 * 60 * 60 * 1000)))
     : 0;
 
   useEffect(() => {
-    if (isExpired && hasAnySchedule && !clearMut.isPending) {
-      clearMut.mutate(undefined, {
+    if (isExpired && hasAnySchedule && !isClearingTimetable) {
+      clearTimetable(undefined, {
         onSuccess: () => toast.info("Your weekly timetable expired. Please upload a new one."),
       });
     }
-  }, [isExpired, hasAnySchedule]);
+  }, [clearTimetable, hasAnySchedule, isClearingTimetable, isExpired]);
 
-  const subjectsById = new Map(subjects.map((s) => [s.id, s]));
+  const subjectsById = new Map(visibleSubjects.map((s) => [s.id, s]));
 
   // Periods scheduled for selected day, sorted by start_time
-  const todayPeriods = periods
+  const todayPeriods = visiblePeriods
     .filter((p) => p.day_of_week === day)
     .sort((a, b) => a.start_time.localeCompare(b.start_time));
 
   // Fallback for subjects without periods (legacy weekly_schedule)
-  const fallback = subjects.filter(
+  const fallback = visibleSubjects.filter(
     (s) =>
       Array.isArray(s.weekly_schedule) &&
       (s.weekly_schedule as number[]).includes(day) &&
-      !periods.some((p) => p.subject_id === s.id),
+      !visiblePeriods.some((p) => p.subject_id === s.id),
   );
 
   const isEmpty = todayPeriods.length === 0 && fallback.length === 0;
 
   // Expired + nothing left to show → dedicated upload prompt
-  if (isExpired && !hasAnySchedule) {
+  if (isExpired) {
     return (
       <main className="px-5 pt-6 pb-8 space-y-6 animate-fade-in">
         <header>
@@ -144,7 +151,7 @@ export default function Timetable() {
         onChange={(e) => e.target.files?.[0] && onPickReplacement(e.target.files[0])}
       />
 
-      {uploadedAt && hasAnySchedule && (
+      {timetableStartedAt && hasAnySchedule && !isExpired && (
         <div className={cn(
           "rounded-2xl px-4 py-3 flex items-center gap-3 shadow-soft",
           daysLeft <= 2 ? "bg-destructive-container text-destructive-container-foreground" : "surface-low"
