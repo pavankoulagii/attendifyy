@@ -22,7 +22,7 @@ export default function Timetable() {
   const { data: subjects = [] } = useSubjects();
   const { data: periods = [] } = useClassPeriods();
   const { data: profile } = useProfile();
-  const clearMut = useClearTimetable();
+  const { mutate: clearTimetable, isPending: isClearingTimetable } = useClearTimetable();
   const [day, setDay] = useState<number>(new Date().getDay());
   const mark = useMarkAttendance();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -41,8 +41,9 @@ export default function Timetable() {
   const triggerUpload = () => fileRef.current?.click();
 
   // Weekly expiry: timetable auto-clears after 7 days from upload
-  const uploadedAt = (profile as any)?.timetable_uploaded_at
-    ? new Date((profile as any).timetable_uploaded_at).getTime()
+  const timetableUploadedAt = (profile as { timetable_uploaded_at?: string | null } | null)?.timetable_uploaded_at;
+  const uploadedAt = timetableUploadedAt
+    ? new Date(timetableUploadedAt).getTime()
     : null;
   const legacyStartedAt = subjects.length > 0
     ? Math.min(...subjects.map((s) => new Date(s.created_at).getTime()).filter(Number.isFinite))
@@ -57,12 +58,12 @@ export default function Timetable() {
     : 0;
 
   useEffect(() => {
-    if (isExpired && hasAnySchedule && !clearMut.isPending) {
-      clearMut.mutate(undefined, {
+    if (isExpired && hasAnySchedule && !isClearingTimetable) {
+      clearTimetable(undefined, {
         onSuccess: () => toast.info("Your weekly timetable expired. Please upload a new one."),
       });
     }
-  }, [isExpired, hasAnySchedule]);
+  }, [clearTimetable, hasAnySchedule, isClearingTimetable, isExpired]);
 
   const subjectsById = new Map(visibleSubjects.map((s) => [s.id, s]));
 
