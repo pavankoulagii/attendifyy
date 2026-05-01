@@ -96,9 +96,9 @@ export default function Timetable() {
             <span className="material-symbols-outlined ms-fill text-white" style={{ fontSize: 32 }}>event_repeat</span>
           </div>
           <div className="space-y-1">
-            <p className="font-headline font-extrabold text-xl">This week's timetable expired</p>
+            <p className="font-headline font-extrabold text-xl">Your timetable expired</p>
             <p className="text-sm text-muted-foreground font-medium max-w-xs mx-auto">
-              Timetables refresh every 7 days. Upload your timetable for the new week to continue tracking.
+              Upload your latest timetable to continue tracking attendance.
             </p>
           </div>
           <Button
