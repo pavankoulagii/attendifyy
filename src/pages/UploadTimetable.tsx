@@ -20,6 +20,7 @@ export default function UploadTimetable() {
   const [stage, setStage] = useState<Stage>("upload");
   const [preview, setPreview] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<ExtractedSubject[]>([]);
+  const [validityDays, setValidityDays] = useState<number>(7);
   const importMut = useImportTimetable();
 
   const handleFile = async (file: File) => {
