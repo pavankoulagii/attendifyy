@@ -80,7 +80,7 @@ export function useImportTimetable() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async ({ subjects, replace = false }: { subjects: ExtractedSubject[]; replace?: boolean }) => {
+    mutationFn: async ({ subjects, replace = false, validityDays = 7 }: { subjects: ExtractedSubject[]; replace?: boolean; validityDays?: number }) => {
       if (!user) throw new Error("not authed");
 
       // Replace mode: wipe old timetable first so the new week starts clean
@@ -91,10 +91,13 @@ export function useImportTimetable() {
         if (sErr) throw sErr;
       }
 
-      // Stamp the weekly upload timestamp so we can auto-expire after 7 days
+      // Stamp upload timestamp + AI-detected validity (in days) for auto-expiry
       await supabase
         .from("profiles")
-        .update({ timetable_uploaded_at: new Date().toISOString() } as any)
+        .update({
+          timetable_uploaded_at: new Date().toISOString(),
+          timetable_valid_days: Math.max(1, Math.min(730, Math.round(validityDays))),
+        } as any)
         .eq("user_id", user.id);
 
       for (let i = 0; i < subjects.length; i++) {
