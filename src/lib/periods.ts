@@ -137,8 +137,11 @@ export function useImportTimetable() {
   });
 }
 
-// Weekly timetable TTL — 7 days from last upload
+// Default timetable TTL — 7 days. The actual TTL is computed dynamically from
+// `profile.timetable_valid_days` (auto-detected by AI from the timetable image).
 export const TIMETABLE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const ttlMsFromDays = (days?: number | null) =>
+  Math.max(1, Math.min(730, Math.round(days ?? 7))) * 24 * 60 * 60 * 1000;
 
 export function useClearTimetable() {
   const qc = useQueryClient();
