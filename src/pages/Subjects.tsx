@@ -9,7 +9,7 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger,
 } from "@/components/ui/drawer";
 
-const FREE_SUBJECT_LIMIT = 5;
+const FREE_SUBJECT_LIMIT = 2;
 
 export default function Subjects() {
   const nav = useNavigate();
@@ -89,7 +89,8 @@ export default function Subjects() {
 
       {/* Subject cards */}
       <div className="space-y-5">
-        {subjects.map((s) => {
+        {subjects.map((s, idx) => {
+          const locked = !isPremium && idx >= FREE_SUBJECT_LIMIT;
           const p = percent(s.classes_attended, s.classes_held);
           const req = Number(s.required_attendance);
           const st = healthStatus(p, req);
@@ -97,10 +98,23 @@ export default function Subjects() {
           const recover = needToRecover(s);
 
           return (
-            <Drawer key={s.id} onOpenChange={(o) => o && setActive(s)}>
+            <Drawer key={s.id} onOpenChange={(o) => {
+              if (o && locked) {
+                toast.error("Free plan: only 2 subjects. Upgrade to Pro to unlock all.");
+                nav("/app/premium");
+                return;
+              }
+              if (o) setActive(s);
+            }}>
               <DrawerTrigger asChild>
-                <button className="w-full text-left tap-scale">
-                  <div className="bg-card rounded-xl p-6 shadow-card">
+                <button className={cn("w-full text-left tap-scale", locked && "opacity-60")}>
+                  <div className="bg-card rounded-xl p-6 shadow-card relative">
+                    {locked && (
+                      <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full bg-primary/15 text-primary text-[10px] font-bold">
+                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>lock</span>
+                        PRO
+                      </div>
+                    )}
                     <div className="flex justify-between items-start mb-4 gap-3">
                       <div className="min-w-0">
                         <h3 className="font-headline font-bold text-xl text-foreground leading-tight truncate">{s.name}</h3>

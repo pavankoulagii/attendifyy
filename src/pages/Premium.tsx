@@ -26,8 +26,7 @@ const features = [
 ];
 
 const plans = [
-  { id: "monthly", name: "Pro Monthly", price: "₹49", amount: 49, sub: "per month", desc: "Cancel anytime" },
-  { id: "yearly", name: "Pro Yearly", price: "₹199", amount: 199, sub: "per year · save 66%", desc: "Best value", best: true },
+  { id: "yearly", name: "Pro Yearly", price: "₹149", amount: 149, sub: "per year · all features", desc: "Best value", best: true },
 ];
 
 const trustBadges = [
@@ -41,7 +40,7 @@ export default function Premium() {
   const { user } = useAuth();
   const { data: profile } = useProfile();
   const qc = useQueryClient();
-  const [plan, setPlan] = useState<"monthly" | "yearly">("yearly");
+  const [plan, setPlan] = useState<"yearly">("yearly");
   const [loading, setLoading] = useState(false);
 
   const selectedPlan = plans.find((p) => p.id === plan)!;
@@ -159,7 +158,7 @@ export default function Premium() {
           return (
             <button
               key={p.id}
-              onClick={() => setPlan(p.id as "monthly" | "yearly")}
+              onClick={() => setPlan("yearly")}
               className={cn(
                 "w-full text-left rounded-xl p-5 tap-scale transition-all relative overflow-hidden",
                 isActive ? "bg-card shadow-glow gradient-border" : "surface-low shadow-soft",

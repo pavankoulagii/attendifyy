@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS timetable_valid_days integer NOT NULL DEFAULT 7;

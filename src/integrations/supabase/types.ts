@@ -104,6 +104,7 @@ export type Database = {
           required_attendance: number
           semester: string | null
           timetable_uploaded_at: string | null
+          timetable_valid_days: number
           updated_at: string
           upi_txn_id: string | null
           user_id: string
@@ -121,6 +122,7 @@ export type Database = {
           required_attendance?: number
           semester?: string | null
           timetable_uploaded_at?: string | null
+          timetable_valid_days?: number
           updated_at?: string
           upi_txn_id?: string | null
           user_id: string
@@ -138,6 +140,7 @@ export type Database = {
           required_attendance?: number
           semester?: string | null
           timetable_uploaded_at?: string | null
+          timetable_valid_days?: number
           updated_at?: string
           upi_txn_id?: string | null
           user_id?: string

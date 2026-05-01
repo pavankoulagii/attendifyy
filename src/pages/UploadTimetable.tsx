@@ -20,6 +20,7 @@ export default function UploadTimetable() {
   const [stage, setStage] = useState<Stage>("upload");
   const [preview, setPreview] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<ExtractedSubject[]>([]);
+  const [validityDays, setValidityDays] = useState<number>(7);
   const importMut = useImportTimetable();
 
   const handleFile = async (file: File) => {
@@ -40,14 +41,17 @@ export default function UploadTimetable() {
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
         const subjects: ExtractedSubject[] = data.subjects || [];
+        const vDays: number = Number(data.validity_days) || 7;
         if (subjects.length === 0) {
           toast.error("Couldn't detect any subjects. Try a clearer image.");
           setStage("upload");
           return;
         }
         setExtracted(subjects);
+        setValidityDays(vDays);
         setStage("review");
-        toast.success(`Found ${subjects.length} subject${subjects.length === 1 ? "" : "s"} 🎉`);
+        const label = vDays >= 300 ? "yearly" : vDays >= 150 ? "6-month" : vDays >= 90 ? "semester" : "weekly";
+        toast.success(`Found ${subjects.length} subject${subjects.length === 1 ? "" : "s"} · ${label} timetable 🎉`);
       } catch (err: any) {
         toast.error(err.message || "Extraction failed");
         setStage("upload");
@@ -73,7 +77,7 @@ export default function UploadTimetable() {
     const valid = extracted.filter((s) => s.name.trim() && s.periods.length > 0);
     if (valid.length === 0) return toast.error("Nothing to save");
     try {
-      await importMut.mutateAsync({ subjects: valid, replace: replaceMode });
+      await importMut.mutateAsync({ subjects: valid, replace: replaceMode, validityDays });
       toast.success(replaceMode ? `New week imported · ${valid.length} subjects` : `Imported ${valid.length} subjects`);
       nav("/app/timetable");
     } catch (err: any) {

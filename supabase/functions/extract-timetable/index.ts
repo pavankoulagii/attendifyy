@@ -27,6 +27,8 @@ Carefully look at the image (rows, columns, headers) and extract every scheduled
 - Ignore breaks, lunch, free periods, empty cells.
 - If a faculty/teacher name is shown alongside a subject, capture it.
 - If a room/venue is shown, capture it. Otherwise null.
+- Detect the timetable's VALIDITY/duration. Look for clues like "w.e.f.", "valid from/till", "semester", "term", date ranges, "academic year", or week numbers.
+  Return validity_days as: 7 for weekly, ~120 for a semester/term, ~180 for 6 months, 365 for yearly. If unclear, default to 7.
 Be thorough — return EVERY class you can see.`;
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -56,6 +58,12 @@ Be thorough — return EVERY class you can see.`;
               parameters: {
                 type: "object",
                 properties: {
+                  validity_days: {
+                    type: "integer",
+                    description: "How many days this timetable is valid for. 7=weekly, 120=semester, 180=6mo, 365=yearly. Default 7 if unclear.",
+                    minimum: 1,
+                    maximum: 730,
+                  },
                   subjects: {
                     type: "array",
                     items: {
@@ -83,7 +91,7 @@ Be thorough — return EVERY class you can see.`;
                     },
                   },
                 },
-                required: ["subjects"],
+                required: ["validity_days", "subjects"],
                 additionalProperties: false,
               },
             },

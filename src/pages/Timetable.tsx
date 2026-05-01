@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMarkAttendance, useSubjects, useProfile, type Subject } from "@/lib/data";
-import { useClassPeriods, useClearTimetable, TIMETABLE_TTL_MS, fmtTime } from "@/lib/periods";
+import { useClassPeriods, useClearTimetable, ttlMsFromDays, fmtTime } from "@/lib/periods";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { percent, healthStatus } from "@/lib/attendance";
@@ -40,8 +40,10 @@ export default function Timetable() {
 
   const triggerUpload = () => fileRef.current?.click();
 
-  // Weekly expiry: timetable auto-clears after 7 days from upload
-  const timetableUploadedAt = (profile as { timetable_uploaded_at?: string | null } | null)?.timetable_uploaded_at;
+  // Timetable expiry: AI-detected validity (defaults to 7 days)
+  const profileX = profile as { timetable_uploaded_at?: string | null; timetable_valid_days?: number | null } | null;
+  const timetableUploadedAt = profileX?.timetable_uploaded_at;
+  const ttlMs = ttlMsFromDays(profileX?.timetable_valid_days);
   const uploadedAt = timetableUploadedAt
     ? new Date(timetableUploadedAt).getTime()
     : null;
@@ -50,11 +52,11 @@ export default function Timetable() {
     : null;
   const timetableStartedAt = uploadedAt ?? legacyStartedAt;
   const hasAnySchedule = periods.length > 0 || subjects.length > 0;
-  const isExpired = !!timetableStartedAt && Date.now() - timetableStartedAt > TIMETABLE_TTL_MS;
+  const isExpired = !!timetableStartedAt && Date.now() - timetableStartedAt > ttlMs;
   const visiblePeriods = isExpired ? [] : periods;
   const visibleSubjects = isExpired ? [] : subjects;
   const daysLeft = timetableStartedAt
-    ? Math.max(0, Math.ceil((timetableStartedAt + TIMETABLE_TTL_MS - Date.now()) / (24 * 60 * 60 * 1000)))
+    ? Math.max(0, Math.ceil((timetableStartedAt + ttlMs - Date.now()) / (24 * 60 * 60 * 1000)))
     : 0;
 
   useEffect(() => {
@@ -94,9 +96,9 @@ export default function Timetable() {
             <span className="material-symbols-outlined ms-fill text-white" style={{ fontSize: 32 }}>event_repeat</span>
           </div>
           <div className="space-y-1">
-            <p className="font-headline font-extrabold text-xl">This week's timetable expired</p>
+            <p className="font-headline font-extrabold text-xl">Your timetable expired</p>
             <p className="text-sm text-muted-foreground font-medium max-w-xs mx-auto">
-              Timetables refresh every 7 days. Upload your timetable for the new week to continue tracking.
+              Upload your latest timetable to continue tracking attendance.
             </p>
           </div>
           <Button
@@ -160,7 +162,7 @@ export default function Timetable() {
           <p className="text-xs font-headline font-bold flex-1">
             {daysLeft === 0
               ? "Expires today — upload a new timetable"
-              : `Weekly timetable · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}
+              : `Timetable active · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}
           </p>
           {daysLeft <= 2 && (
             <button
@@ -205,6 +207,8 @@ export default function Timetable() {
           {todayPeriods.map((p) => {
             const subject = subjectsById.get(p.subject_id);
             if (!subject) return null;
+            const subjectIdx = visibleSubjects.findIndex((s) => s.id === subject.id);
+            const locked = !profile?.is_premium && subjectIdx >= 2;
             return (
               <PeriodCard
                 key={p.id}
@@ -212,7 +216,13 @@ export default function Timetable() {
                 start={p.start_time}
                 end={p.end_time}
                 room={p.room}
+                locked={locked}
                 onMark={(st) => {
+                  if (locked) {
+                    toast.error("Free plan: only 2 subjects. Upgrade to Pro to unlock all.");
+                    nav("/app/premium");
+                    return;
+                  }
                   mark.mutate({ subject, status: st });
                   toast.success(`${subject.name}: ${st}`);
                 }}
@@ -220,19 +230,29 @@ export default function Timetable() {
             );
           })}
 
-          {fallback.map((s) => (
-            <PeriodCard
-              key={s.id}
-              subject={s}
-              start={null}
-              end={null}
-              room={null}
-              onMark={(st) => {
-                mark.mutate({ subject: s, status: st });
-                toast.success(`${s.name}: ${st}`);
-              }}
-            />
-          ))}
+          {fallback.map((s) => {
+            const subjectIdx = visibleSubjects.findIndex((x) => x.id === s.id);
+            const locked = !profile?.is_premium && subjectIdx >= 2;
+            return (
+              <PeriodCard
+                key={s.id}
+                subject={s}
+                start={null}
+                end={null}
+                room={null}
+                locked={locked}
+                onMark={(st) => {
+                  if (locked) {
+                    toast.error("Free plan: only 2 subjects. Upgrade to Pro to unlock all.");
+                    nav("/app/premium");
+                    return;
+                  }
+                  mark.mutate({ subject: s, status: st });
+                  toast.success(`${s.name}: ${st}`);
+                }}
+              />
+            );
+          })}
         </section>
       )}
     </main>
@@ -240,19 +260,26 @@ export default function Timetable() {
 }
 
 function PeriodCard({
-  subject, start, end, room, onMark,
+  subject, start, end, room, onMark, locked = false,
 }: {
   subject: Subject;
   start: string | null;
   end: string | null;
   room: string | null;
   onMark: (s: "present" | "absent" | "cancelled") => void;
+  locked?: boolean;
 }) {
   const p = percent(subject.classes_attended, subject.classes_held);
   const st = healthStatus(p, Number(subject.required_attendance));
 
   return (
-    <div className="bg-card rounded-2xl p-5 shadow-card space-y-4">
+    <div className={cn("bg-card rounded-2xl p-5 shadow-card space-y-4 relative", locked && "opacity-60")}>
+      {locked && (
+        <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full bg-primary/15 text-primary text-[10px] font-bold">
+          <span className="material-symbols-outlined" style={{ fontSize: 12 }}>lock</span>
+          PRO
+        </div>
+      )}
       <div className="flex items-center gap-4">
         <div
           className="h-12 w-12 rounded-2xl grid place-items-center text-white shrink-0 shadow-soft"

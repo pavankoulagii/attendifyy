@@ -5,8 +5,7 @@ const KEY_ID = Deno.env.get("RAZORPAY_KEY_ID")!;
 const KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET")!;
 
 const PLANS: Record<string, { amount: number; name: string }> = {
-  monthly: { amount: 4900, name: "Attendify Pro Monthly" }, // ₹49
-  yearly: { amount: 19900, name: "Attendify Pro Yearly" },  // ₹199
+  yearly: { amount: 14900, name: "Attendify Pro Yearly" },  // ₹149
 };
 
 Deno.serve(async (req) => {
