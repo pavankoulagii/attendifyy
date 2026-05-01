@@ -41,14 +41,17 @@ export default function UploadTimetable() {
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
         const subjects: ExtractedSubject[] = data.subjects || [];
+        const vDays: number = Number(data.validity_days) || 7;
         if (subjects.length === 0) {
           toast.error("Couldn't detect any subjects. Try a clearer image.");
           setStage("upload");
           return;
         }
         setExtracted(subjects);
+        setValidityDays(vDays);
         setStage("review");
-        toast.success(`Found ${subjects.length} subject${subjects.length === 1 ? "" : "s"} 🎉`);
+        const label = vDays >= 300 ? "yearly" : vDays >= 150 ? "6-month" : vDays >= 90 ? "semester" : "weekly";
+        toast.success(`Found ${subjects.length} subject${subjects.length === 1 ? "" : "s"} · ${label} timetable 🎉`);
       } catch (err: any) {
         toast.error(err.message || "Extraction failed");
         setStage("upload");
