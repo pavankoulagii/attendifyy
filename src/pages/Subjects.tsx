@@ -89,7 +89,8 @@ export default function Subjects() {
 
       {/* Subject cards */}
       <div className="space-y-5">
-        {subjects.map((s) => {
+        {subjects.map((s, idx) => {
+          const locked = !isPremium && idx >= FREE_SUBJECT_LIMIT;
           const p = percent(s.classes_attended, s.classes_held);
           const req = Number(s.required_attendance);
           const st = healthStatus(p, req);
