@@ -258,13 +258,14 @@ export default function Timetable() {
 }
 
 function PeriodCard({
-  subject, start, end, room, onMark,
+  subject, start, end, room, onMark, locked = false,
 }: {
   subject: Subject;
   start: string | null;
   end: string | null;
   room: string | null;
   onMark: (s: "present" | "absent" | "cancelled") => void;
+  locked?: boolean;
 }) {
   const p = percent(subject.classes_attended, subject.classes_held);
   const st = healthStatus(p, Number(subject.required_attendance));
