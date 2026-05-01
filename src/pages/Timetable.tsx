@@ -205,6 +205,8 @@ export default function Timetable() {
           {todayPeriods.map((p) => {
             const subject = subjectsById.get(p.subject_id);
             if (!subject) return null;
+            const subjectIdx = visibleSubjects.findIndex((s) => s.id === subject.id);
+            const locked = !profile?.is_premium && subjectIdx >= 2;
             return (
               <PeriodCard
                 key={p.id}
@@ -212,7 +214,13 @@ export default function Timetable() {
                 start={p.start_time}
                 end={p.end_time}
                 room={p.room}
+                locked={locked}
                 onMark={(st) => {
+                  if (locked) {
+                    toast.error("Free plan: only 2 subjects. Upgrade to Pro to unlock all.");
+                    nav("/app/premium");
+                    return;
+                  }
                   mark.mutate({ subject, status: st });
                   toast.success(`${subject.name}: ${st}`);
                 }}
@@ -220,19 +228,29 @@ export default function Timetable() {
             );
           })}
 
-          {fallback.map((s) => (
-            <PeriodCard
-              key={s.id}
-              subject={s}
-              start={null}
-              end={null}
-              room={null}
-              onMark={(st) => {
-                mark.mutate({ subject: s, status: st });
-                toast.success(`${s.name}: ${st}`);
-              }}
-            />
-          ))}
+          {fallback.map((s) => {
+            const subjectIdx = visibleSubjects.findIndex((x) => x.id === s.id);
+            const locked = !profile?.is_premium && subjectIdx >= 2;
+            return (
+              <PeriodCard
+                key={s.id}
+                subject={s}
+                start={null}
+                end={null}
+                room={null}
+                locked={locked}
+                onMark={(st) => {
+                  if (locked) {
+                    toast.error("Free plan: only 2 subjects. Upgrade to Pro to unlock all.");
+                    nav("/app/premium");
+                    return;
+                  }
+                  mark.mutate({ subject: s, status: st });
+                  toast.success(`${s.name}: ${st}`);
+                }}
+              />
+            );
+          })}
         </section>
       )}
     </main>
