@@ -26,8 +26,7 @@ const features = [
 ];
 
 const plans = [
-  { id: "monthly", name: "Pro Monthly", price: "₹49", amount: 49, sub: "per month", desc: "Cancel anytime" },
-  { id: "yearly", name: "Pro Yearly", price: "₹199", amount: 199, sub: "per year · save 66%", desc: "Best value", best: true },
+  { id: "yearly", name: "Pro Yearly", price: "₹149", amount: 149, sub: "per year · all features", desc: "Best value", best: true },
 ];
 
 const trustBadges = [
