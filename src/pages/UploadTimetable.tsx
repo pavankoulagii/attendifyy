@@ -77,7 +77,7 @@ export default function UploadTimetable() {
     const valid = extracted.filter((s) => s.name.trim() && s.periods.length > 0);
     if (valid.length === 0) return toast.error("Nothing to save");
     try {
-      await importMut.mutateAsync({ subjects: valid, replace: replaceMode });
+      await importMut.mutateAsync({ subjects: valid, replace: replaceMode, validityDays });
       toast.success(replaceMode ? `New week imported · ${valid.length} subjects` : `Imported ${valid.length} subjects`);
       nav("/app/timetable");
     } catch (err: any) {
