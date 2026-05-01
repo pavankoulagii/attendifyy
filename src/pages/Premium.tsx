@@ -40,7 +40,7 @@ export default function Premium() {
   const { user } = useAuth();
   const { data: profile } = useProfile();
   const qc = useQueryClient();
-  const [plan, setPlan] = useState<"monthly" | "yearly">("yearly");
+  const [plan, setPlan] = useState<"yearly">("yearly");
   const [loading, setLoading] = useState(false);
 
   const selectedPlan = plans.find((p) => p.id === plan)!;
