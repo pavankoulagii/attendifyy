@@ -158,7 +158,7 @@ export default function Premium() {
           return (
             <button
               key={p.id}
-              onClick={() => setPlan(p.id as "monthly" | "yearly")}
+              onClick={() => setPlan("yearly")}
               className={cn(
                 "w-full text-left rounded-xl p-5 tap-scale transition-all relative overflow-hidden",
                 isActive ? "bg-card shadow-glow gradient-border" : "surface-low shadow-soft",
