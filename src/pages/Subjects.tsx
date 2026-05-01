@@ -9,7 +9,7 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger,
 } from "@/components/ui/drawer";
 
-const FREE_SUBJECT_LIMIT = 5;
+const FREE_SUBJECT_LIMIT = 2;
 
 export default function Subjects() {
   const nav = useNavigate();
