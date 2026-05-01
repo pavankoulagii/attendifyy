@@ -162,7 +162,7 @@ export default function Timetable() {
           <p className="text-xs font-headline font-bold flex-1">
             {daysLeft === 0
               ? "Expires today — upload a new timetable"
-              : `Weekly timetable · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}
+              : `Timetable active · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}
           </p>
           {daysLeft <= 2 && (
             <button
