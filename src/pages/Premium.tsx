@@ -1,24 +1,18 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { useUpdateProfile } from "@/lib/data";
+import { useProfile } from "@/lib/data";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import upiQr from "@/assets/upi-qr.jpg";
+import { useQueryClient } from "@tanstack/react-query";
 
-// Strict UTR validator: 12 digits, not all-same, not trivial sequence
-function isValidUtr(s: string): boolean {
-  if (!/^\d{12}$/.test(s)) return false;
-  if (/^(\d)\1{11}$/.test(s)) return false; // 000000000000, 111111111111, ...
-  if (s === "123456789012" || s === "012345678901") return false;
-  return true;
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
 }
-
-const UPI_ID = "attendify@ybl";
-const UPI_NAME = "Attendify";
 
 const features = [
   { icon: "all_inclusive", text: "Unlimited subjects" },
@@ -32,120 +26,98 @@ const features = [
 ];
 
 const plans = [
-  { id: "free", name: "Free", price: "₹0", amount: 0, sub: "Forever", desc: "5 subjects only" },
   { id: "monthly", name: "Pro Monthly", price: "₹49", amount: 49, sub: "per month", desc: "Cancel anytime" },
-  { id: "yearly", name: "Pro Yearly", price: "₹149", amount: 149, sub: "per year · save 75%", desc: "Best value", best: true },
+  { id: "yearly", name: "Pro Yearly", price: "₹199", amount: 199, sub: "per year · save 66%", desc: "Best value", best: true },
 ];
 
-type PayStage = "idle" | "scan" | "txn" | "processing" | "success";
+const trustBadges = [
+  { icon: "verified_user", text: "Secure Payment" },
+  { icon: "bolt", text: "Instant Activation" },
+  { icon: "groups", text: "Trusted by Students" },
+];
 
 export default function Premium() {
   const nav = useNavigate();
   const { user } = useAuth();
-  const [plan, setPlan] = useState("yearly");
-  const [stage, setStage] = useState<PayStage>("idle");
-  const [txnId, setTxnId] = useState("");
-  const [proofFile, setProofFile] = useState<File | null>(null);
-  const [proofError, setProofError] = useState<string | null>(null);
-  const updateProfile = useUpdateProfile();
+  const { data: profile } = useProfile();
+  const qc = useQueryClient();
+  const [plan, setPlan] = useState<"monthly" | "yearly">("yearly");
+  const [loading, setLoading] = useState(false);
 
   const selectedPlan = plans.find((p) => p.id === plan)!;
-  const amount = selectedPlan.price;
 
-  const startPayment = () => {
-    if (plan === "free") {
-      nav("/app");
-      return;
-    }
-    setTxnId("");
-    setProofFile(null);
-    setProofError(null);
-    setStage("scan");
-  };
-
-  const submitTxn = async () => {
-    const trimmed = txnId.trim();
-    if (!isValidUtr(trimmed)) {
-      toast.error("UTR must be exactly 12 digits (check your UPI app)");
-      return;
-    }
-    if (!proofFile) {
-      setProofError("Please upload a screenshot of the payment success");
-      toast.error("Screenshot is required");
-      return;
-    }
-    if (proofError) {
-      toast.error(proofError);
-      return;
-    }
+  const startPayment = async () => {
     if (!user) {
-      toast.error("Please sign in again");
+      toast.error("Please sign in to continue");
+      nav("/auth");
+      return;
+    }
+    if (typeof window.Razorpay === "undefined") {
+      toast.error("Payment system not ready. Please refresh and try again.");
       return;
     }
 
-    setStage("processing");
+    setLoading(true);
     try {
-      // 1) Reject if this txn ID was already used by anyone
-      const { data: existing, error: lookupError } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .eq("upi_txn_id", trimmed)
-        .maybeSingle();
-      if (lookupError) throw lookupError;
-      if (existing) {
-        toast.error("This transaction ID has already been used.");
-        setStage("txn");
-        return;
-      }
+      const { data, error } = await supabase.functions.invoke("razorpay-create-order", {
+        body: { plan },
+      });
+      if (error) throw error;
+      if (!data?.orderId) throw new Error("Could not create order");
 
-      // 2) Upload screenshot to private bucket under user's folder
-      const ext = (proofFile.name.split(".").pop() || "jpg").toLowerCase();
-      const path = `${user.id}/${trimmed}-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from("payment-proofs")
-        .upload(path, proofFile, { contentType: proofFile.type, upsert: false });
-      if (upErr) throw upErr;
+      const rzp = new window.Razorpay({
+        key: data.keyId,
+        amount: data.amount,
+        currency: data.currency,
+        order_id: data.orderId,
+        name: "Attendify",
+        description: data.planName,
+        image: "/favicon.svg",
+        prefill: {
+          email: user.email ?? "",
+          name: profile?.display_name ?? "",
+        },
+        theme: { color: "#2563eb" },
+        method: {
+          upi: true,
+          card: true,
+          netbanking: true,
+          wallet: true,
+        },
+        handler: async (response: any) => {
+          try {
+            const { error: vErr } = await supabase.functions.invoke("razorpay-verify-payment", {
+              body: {
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                plan,
+              },
+            });
+            if (vErr) throw vErr;
+            await qc.invalidateQueries({ queryKey: ["profile"] });
+            toast.success("Welcome to Attendify Pro! 🎉");
+            nav("/app/profile");
+          } catch (e: any) {
+            toast.error(e.message ?? "Could not verify payment");
+          }
+        },
+        modal: {
+          ondismiss: () => setLoading(false),
+        },
+      });
 
-      // 3) Activate Pro
-      await updateProfile.mutateAsync({
-        is_premium: true,
-        upi_txn_id: trimmed,
-        premium_plan: plan,
-        premium_paid_at: new Date().toISOString(),
-        payment_proof_path: path,
-      } as any);
-      setStage("success");
+      rzp.on("payment.failed", (resp: any) => {
+        toast.error(resp.error?.description ?? "Payment failed");
+        setLoading(false);
+      });
+
+      rzp.open();
     } catch (e: any) {
-      const msg = String(e?.message || "");
-      if (msg.includes("profiles_upi_txn_id_unique") || msg.toLowerCase().includes("duplicate")) {
-        toast.error("This transaction ID has already been used.");
-      } else {
-        toast.error(msg || "Could not confirm payment");
-      }
-      setStage("txn");
+      toast.error(e.message ?? "Could not start payment");
+      setLoading(false);
     }
   };
-
-  if (stage !== "idle") {
-    return (
-      <PaymentFlow
-        stage={stage}
-        amount={amount}
-        planName={selectedPlan.name}
-        txnId={txnId}
-        setTxnId={setTxnId}
-        proofFile={proofFile}
-        setProofFile={setProofFile}
-        proofError={proofError}
-        setProofError={setProofError}
-        onProceedToTxn={() => setStage("txn")}
-        onSubmitTxn={submitTxn}
-        onBack={() => setStage(stage === "txn" ? "scan" : "idle")}
-        onClose={() => setStage("idle")}
-        onDone={() => nav("/app/profile")}
-      />
-    );
-  }
 
   return (
     <main className="px-5 pt-6 pb-8 space-y-6 animate-fade-in">
@@ -166,8 +138,18 @@ export default function Premium() {
           Unlock <span className="text-gradient">everything</span>
         </h2>
         <p className="text-sm text-muted-foreground font-medium max-w-xs mx-auto">
-          Built for serious students. Loved by toppers across 200+ campuses.
+          Pay securely with UPI in seconds ⚡
         </p>
+      </section>
+
+      {/* Trust badges */}
+      <section className="grid grid-cols-3 gap-2">
+        {trustBadges.map((b) => (
+          <div key={b.text} className="surface-low rounded-xl p-3 flex flex-col items-center gap-1 text-center">
+            <span className="material-symbols-outlined ms-fill text-primary" style={{ fontSize: 20 }}>{b.icon}</span>
+            <p className="text-[10px] font-bold text-foreground leading-tight">{b.text}</p>
+          </div>
+        ))}
       </section>
 
       {/* Plan selector */}
@@ -177,12 +159,10 @@ export default function Premium() {
           return (
             <button
               key={p.id}
-              onClick={() => setPlan(p.id)}
+              onClick={() => setPlan(p.id as "monthly" | "yearly")}
               className={cn(
                 "w-full text-left rounded-xl p-5 tap-scale transition-all relative overflow-hidden",
-                isActive
-                  ? "bg-card shadow-glow gradient-border"
-                  : "surface-low shadow-soft"
+                isActive ? "bg-card shadow-glow gradient-border" : "surface-low shadow-soft",
               )}
             >
               {p.best && (
@@ -193,7 +173,7 @@ export default function Premium() {
               <div className="relative flex items-center gap-4">
                 <div className={cn(
                   "h-6 w-6 rounded-full grid place-items-center shrink-0 transition-all",
-                  isActive ? "gradient-primary shadow-glow" : "surface-high"
+                  isActive ? "gradient-primary shadow-glow" : "surface-high",
                 )}>
                   {isActive && (
                     <span className="material-symbols-outlined ms-fill text-white" style={{ fontSize: 14 }}>check</span>
@@ -230,342 +210,25 @@ export default function Premium() {
       {/* CTA */}
       <Button
         onClick={startPayment}
+        disabled={loading}
         className="w-full h-14 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale flex items-center justify-center gap-2"
       >
-        <span className="material-symbols-outlined ms-fill" style={{ fontSize: 22 }}>
-          {plan === "free" ? "auto_awesome" : "qr_code_scanner"}
-        </span>
-        {plan === "free" ? "Continue free" : `Pay ${amount} via UPI`}
-      </Button>
-      <p className="text-center text-[11px] text-muted-foreground font-medium">Secure UPI payment · Cancel anytime</p>
-    </main>
-  );
-}
-
-function PaymentFlow({
-  stage,
-  amount,
-  planName,
-  txnId,
-  setTxnId,
-  proofFile,
-  setProofFile,
-  proofError,
-  setProofError,
-  onProceedToTxn,
-  onSubmitTxn,
-  onBack,
-  onClose,
-  onDone,
-}: {
-  stage: PayStage;
-  amount: string;
-  planName: string;
-  txnId: string;
-  setTxnId: (v: string) => void;
-  proofFile: File | null;
-  setProofFile: (f: File | null) => void;
-  proofError: string | null;
-  setProofError: (e: string | null) => void;
-  onProceedToTxn: () => void;
-  onSubmitTxn: () => void;
-  onBack: () => void;
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const previewUrl = proofFile ? URL.createObjectURL(proofFile) : null;
-  const [qrFullscreen, setQrFullscreen] = useState(false);
-  const [qrFailed, setQrFailed] = useState(false);
-
-  const MIN_DIM = 300; // px
-  const MAX_BYTES = 5 * 1024 * 1024;
-
-  const handleFile = (file: File | null) => {
-    setProofError(null);
-    if (!file) {
-      setProofFile(null);
-      return;
-    }
-    if (!file.type.startsWith("image/")) {
-      setProofError("File must be an image (PNG or JPG)");
-      setProofFile(null);
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      setProofError("Image is too large — keep it under 5 MB");
-      setProofFile(null);
-      return;
-    }
-    if (file.size < 5 * 1024) {
-      setProofError("Image looks too small to be a real screenshot");
-      setProofFile(null);
-      return;
-    }
-    // Validate dimensions
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      if (img.width < MIN_DIM || img.height < MIN_DIM) {
-        setProofError(`Screenshot must be at least ${MIN_DIM}×${MIN_DIM}px (yours: ${img.width}×${img.height})`);
-        setProofFile(null);
-        return;
-      }
-      setProofFile(file);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      setProofError("Could not read image — please try a different screenshot");
-      setProofFile(null);
-    };
-    img.src = url;
-  };
-
-  return (
-    <main className="min-h-[100dvh] px-5 pt-6 pb-12 flex flex-col animate-fade-in overflow-y-auto">
-      {/* Header */}
-      <header className="flex items-center gap-3 mb-6">
-        {(stage === "scan" || stage === "txn") && (
-          <button onClick={stage === "txn" ? onBack : onClose} className="h-11 w-11 rounded-full glass grid place-items-center text-primary tap-scale shadow-soft">
-            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
-          </button>
-        )}
-        <div>
-          <p className="text-[11px] uppercase tracking-widest font-bold text-primary">{planName}</p>
-          <h1 className="font-headline font-extrabold text-xl tracking-tight">
-            {stage === "scan" && "Scan to pay"}
-            {stage === "txn" && "Enter transaction ID"}
-            {stage === "processing" && "Verifying…"}
-            {stage === "success" && "Payment successful"}
-          </h1>
-        </div>
-      </header>
-
-      <div className="flex-1 flex flex-col items-center justify-center space-y-6">
-        {stage === "scan" && (
+        {loading ? (
           <>
-            <div className="bg-card rounded-3xl p-4 shadow-card w-full max-w-xs space-y-3">
-              <button
-                type="button"
-                onClick={() => { setQrFailed(false); setQrFullscreen(true); }}
-                className="qr-frame rounded-2xl bg-white relative overflow-hidden aspect-square w-full tap-scale ring-2 ring-primary/40 shadow-glow"
-                aria-label="Open QR fullscreen"
-              >
-                <img
-                  src={upiQr}
-                  alt="UPI QR code"
-                  className="qr-img"
-                  onError={() => setQrFailed(true)}
-                />
-                <div className="absolute inset-x-4 h-1 rounded-full bg-primary/70 shadow-glow animate-scan-line pointer-events-none z-10" />
-                <div className="absolute bottom-2 right-2 h-8 w-8 rounded-full bg-primary text-primary-foreground grid place-items-center shadow-glow z-10">
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>fullscreen</span>
-                </div>
-              </button>
-              <div className="text-center space-y-1">
-                <p className="text-xs text-muted-foreground font-medium">Pay to</p>
-                <p className="font-headline font-bold text-base">{UPI_NAME}</p>
-                <p className="text-xs text-muted-foreground font-medium font-mono">{UPI_ID}</p>
-                <p className="font-headline font-black text-3xl mt-2 text-gradient">{amount}</p>
-              </div>
-              <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground font-medium">
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
-                Secured by Lovable Pay
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground font-medium text-center max-w-xs">
-              Open any UPI app · GPay, PhonePe, Paytm · Scan the code to complete payment
-            </p>
-            <Button
-              onClick={onProceedToTxn}
-              className="w-full max-w-xs h-14 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined ms-fill" style={{ fontSize: 20 }}>check_circle</span>
-              I've paid · Enter txn ID
-            </Button>
+            <span className="material-symbols-outlined animate-spin" style={{ fontSize: 22 }}>progress_activity</span>
+            Opening checkout…
+          </>
+        ) : (
+          <>
+            <span className="material-symbols-outlined ms-fill" style={{ fontSize: 22 }}>bolt</span>
+            Continue with UPI · {selectedPlan.price}
           </>
         )}
-
-        {stage === "txn" && (
-          <div className="w-full max-w-xs space-y-5">
-            <div className="bg-card rounded-3xl p-6 shadow-card space-y-4">
-              <div className="text-center space-y-1">
-                <div className="inline-grid h-14 w-14 rounded-2xl gradient-primary shadow-glow place-items-center mx-auto">
-                  <span className="material-symbols-outlined ms-fill text-white" style={{ fontSize: 28 }}>receipt_long</span>
-                </div>
-                <p className="font-headline font-bold text-lg pt-2">Confirm your payment</p>
-                <p className="text-xs text-muted-foreground font-medium">
-                  Paste the 12-digit UTR / transaction ID from your UPI app
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Input
-                  value={txnId}
-                  onChange={(e) => setTxnId(e.target.value.replace(/\D+/g, "").slice(0, 12))}
-                  placeholder="123456789012"
-                  inputMode="numeric"
-                  autoFocus
-                  maxLength={12}
-                  className="h-12 text-center font-mono tracking-widest text-base"
-                />
-                <p className="text-[11px] text-muted-foreground font-medium text-center">
-                  Exactly 12 digits · Find under "Transaction details" in PhonePe / GPay / Paytm
-                </p>
-              </div>
-
-              {/* Screenshot upload */}
-              <div className="space-y-2">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/jpg,image/webp"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
-                />
-                {!previewUrl ? (
-                  <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    className={cn(
-                      "w-full h-24 rounded-xl surface-low border-2 border-dashed grid place-items-center tap-scale",
-                      proofError ? "border-destructive/60" : "border-primary/30"
-                    )}
-                  >
-                    <div className="text-center">
-                      <span className="material-symbols-outlined text-primary block" style={{ fontSize: 26 }}>add_photo_alternate</span>
-                      <p className="text-xs font-bold text-primary mt-0.5">Upload payment screenshot</p>
-                      <p className="text-[10px] text-muted-foreground font-medium">Required · PNG/JPG · min 300×300 · max 5MB</p>
-                    </div>
-                  </button>
-                ) : (
-                  <div className="relative rounded-xl overflow-hidden surface-low">
-                    <img src={previewUrl} alt="Payment screenshot" className="w-full max-h-44 object-contain bg-black/5" />
-                    <button
-                      type="button"
-                      onClick={() => { setProofFile(null); setProofError(null); if (fileRef.current) fileRef.current.value = ""; }}
-                      className="absolute top-2 right-2 h-8 w-8 rounded-full bg-background/90 grid place-items-center shadow-soft tap-scale"
-                      aria-label="Remove screenshot"
-                    >
-                      <span className="material-symbols-outlined text-destructive" style={{ fontSize: 18 }}>close</span>
-                    </button>
-                  </div>
-                )}
-                {proofError && (
-                  <div className="flex items-start gap-1.5 text-[11px] text-destructive font-medium">
-                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>error</span>
-                    <span>{proofError}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between text-xs surface-low rounded-xl px-3 py-2">
-                <span className="text-muted-foreground font-medium">Amount paid</span>
-                <span className="font-headline font-bold">{amount}</span>
-              </div>
-            </div>
-            <Button
-              onClick={onSubmitTxn}
-              className="w-full h-14 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined ms-fill" style={{ fontSize: 20 }}>verified</span>
-              Verify & activate Pro
-            </Button>
-          </div>
-        )}
-
-        {stage === "processing" && (
-          <div className="flex flex-col items-center gap-5">
-            <div className="h-24 w-24 rounded-full gradient-primary shadow-glow grid place-items-center animate-pulse">
-              <span className="material-symbols-outlined ms-fill text-white animate-spin" style={{ fontSize: 44, animationDuration: "1.4s" }}>
-                progress_activity
-              </span>
-            </div>
-            <div className="text-center space-y-1">
-              <p className="font-headline font-bold text-lg">Verifying payment</p>
-              <p className="text-xs text-muted-foreground font-medium">Please don't close this screen…</p>
-            </div>
-          </div>
-        )}
-
-        {stage === "success" && (
-          <div className="flex flex-col items-center gap-5 animate-fade-in">
-            <div className="h-28 w-28 rounded-full bg-emerald-500/15 grid place-items-center">
-              <div className="h-20 w-20 rounded-full bg-emerald-500 grid place-items-center shadow-glow">
-                <span className="material-symbols-outlined ms-fill text-white" style={{ fontSize: 48 }}>check</span>
-              </div>
-            </div>
-            <div className="text-center space-y-1">
-              <p className="font-headline font-extrabold text-2xl">Welcome to Pro 🎉</p>
-              <p className="text-sm text-muted-foreground font-medium">Paid {amount} · {planName}</p>
-              {txnId && (
-                <p className="text-[11px] text-muted-foreground font-mono pt-1">Txn: {txnId}</p>
-              )}
-            </div>
-            <Button
-              onClick={onDone}
-              className="h-12 px-8 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale"
-            >
-              Continue
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Fullscreen QR overlay */}
-      {qrFullscreen && stage === "scan" && (
-        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 animate-fade-in">
-          <button
-            onClick={() => setQrFullscreen(false)}
-            className="absolute top-5 right-5 h-12 w-12 rounded-full bg-white/10 grid place-items-center text-white tap-scale"
-            aria-label="Close fullscreen QR"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 26 }}>close</span>
-          </button>
-
-          <div className="text-center mb-5">
-            <p className="text-[11px] uppercase tracking-widest font-bold text-primary">Scan to pay</p>
-            <p className="font-headline font-extrabold text-2xl text-white mt-1">{amount}</p>
-            <p className="text-xs text-white/70 font-medium">{UPI_NAME} · {UPI_ID}</p>
-          </div>
-
-          <div className="qr-frame qr-frame-lg relative bg-white rounded-3xl shadow-glow ring-4 ring-primary/80 max-w-[min(90vw,460px)] w-full aspect-square overflow-hidden">
-            {!qrFailed ? (
-              <>
-                <img
-                  src={upiQr}
-                  alt="UPI QR code fullscreen"
-                  className="qr-img"
-                  onError={() => setQrFailed(true)}
-                />
-                <div className="absolute inset-x-6 h-1 rounded-full bg-primary shadow-glow animate-scan-line pointer-events-none" />
-              </>
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center p-6">
-                <div className="h-16 w-16 rounded-full bg-destructive/15 grid place-items-center">
-                  <span className="material-symbols-outlined text-destructive" style={{ fontSize: 32 }}>error</span>
-                </div>
-                <p className="font-headline font-bold text-base text-foreground">Couldn't load QR code</p>
-                <p className="text-xs text-muted-foreground font-medium max-w-xs">
-                  Check your connection and try again
-                </p>
-                <Button
-                  onClick={() => { setQrFailed(false); }}
-                  className="h-11 px-6 rounded-2xl gradient-primary border-0 shadow-glow font-headline font-bold tap-scale flex items-center gap-2"
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>refresh</span>
-                  Try again
-                </Button>
-              </div>
-            )}
-          </div>
-
-          <p className="text-xs text-white/70 font-medium text-center mt-5 max-w-xs">
-            Open any UPI app · GPay, PhonePe, Paytm
-          </p>
-        </div>
-      )}
+      </Button>
+      <p className="text-center text-[11px] text-muted-foreground font-medium flex items-center justify-center gap-1">
+        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>lock</span>
+        Secured by Razorpay · UPI · Cards · Netbanking · Wallets
+      </p>
     </main>
   );
 }
