@@ -58,6 +58,12 @@ Be thorough — return EVERY class you can see.`;
               parameters: {
                 type: "object",
                 properties: {
+                  validity_days: {
+                    type: "integer",
+                    description: "How many days this timetable is valid for. 7=weekly, 120=semester, 180=6mo, 365=yearly. Default 7 if unclear.",
+                    minimum: 1,
+                    maximum: 730,
+                  },
                   subjects: {
                     type: "array",
                     items: {
@@ -85,7 +91,7 @@ Be thorough — return EVERY class you can see.`;
                     },
                   },
                 },
-                required: ["subjects"],
+                required: ["validity_days", "subjects"],
                 additionalProperties: false,
               },
             },
