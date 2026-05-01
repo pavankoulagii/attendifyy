@@ -271,7 +271,13 @@ function PeriodCard({
   const st = healthStatus(p, Number(subject.required_attendance));
 
   return (
-    <div className="bg-card rounded-2xl p-5 shadow-card space-y-4">
+    <div className={cn("bg-card rounded-2xl p-5 shadow-card space-y-4 relative", locked && "opacity-60")}>
+      {locked && (
+        <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full bg-primary/15 text-primary text-[10px] font-bold">
+          <span className="material-symbols-outlined" style={{ fontSize: 12 }}>lock</span>
+          PRO
+        </div>
+      )}
       <div className="flex items-center gap-4">
         <div
           className="h-12 w-12 rounded-2xl grid place-items-center text-white shrink-0 shadow-soft"
