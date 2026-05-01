@@ -40,8 +40,10 @@ export default function Timetable() {
 
   const triggerUpload = () => fileRef.current?.click();
 
-  // Weekly expiry: timetable auto-clears after 7 days from upload
-  const timetableUploadedAt = (profile as { timetable_uploaded_at?: string | null } | null)?.timetable_uploaded_at;
+  // Timetable expiry: AI-detected validity (defaults to 7 days)
+  const profileX = profile as { timetable_uploaded_at?: string | null; timetable_valid_days?: number | null } | null;
+  const timetableUploadedAt = profileX?.timetable_uploaded_at;
+  const ttlMs = ttlMsFromDays(profileX?.timetable_valid_days);
   const uploadedAt = timetableUploadedAt
     ? new Date(timetableUploadedAt).getTime()
     : null;
@@ -50,11 +52,11 @@ export default function Timetable() {
     : null;
   const timetableStartedAt = uploadedAt ?? legacyStartedAt;
   const hasAnySchedule = periods.length > 0 || subjects.length > 0;
-  const isExpired = !!timetableStartedAt && Date.now() - timetableStartedAt > TIMETABLE_TTL_MS;
+  const isExpired = !!timetableStartedAt && Date.now() - timetableStartedAt > ttlMs;
   const visiblePeriods = isExpired ? [] : periods;
   const visibleSubjects = isExpired ? [] : subjects;
   const daysLeft = timetableStartedAt
-    ? Math.max(0, Math.ceil((timetableStartedAt + TIMETABLE_TTL_MS - Date.now()) / (24 * 60 * 60 * 1000)))
+    ? Math.max(0, Math.ceil((timetableStartedAt + ttlMs - Date.now()) / (24 * 60 * 60 * 1000)))
     : 0;
 
   useEffect(() => {
