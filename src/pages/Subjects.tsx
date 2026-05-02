@@ -9,7 +9,7 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger,
 } from "@/components/ui/drawer";
 
-const FREE_SUBJECT_LIMIT = 2;
+const FREE_SUBJECT_LIMIT = 3;
 
 export default function Subjects() {
   const nav = useNavigate();
@@ -100,7 +100,7 @@ export default function Subjects() {
           return (
             <Drawer key={s.id} onOpenChange={(o) => {
               if (o && locked) {
-                toast.error("Free plan: only 2 subjects. Upgrade to Pro to unlock all.");
+                toast.error("Free plan: only 3 subjects. Upgrade to Pro to unlock all.");
                 nav("/app/premium");
                 return;
               }

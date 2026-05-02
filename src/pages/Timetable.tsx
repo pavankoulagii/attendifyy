@@ -208,7 +208,7 @@ export default function Timetable() {
             const subject = subjectsById.get(p.subject_id);
             if (!subject) return null;
             const subjectIdx = visibleSubjects.findIndex((s) => s.id === subject.id);
-            const locked = !profile?.is_premium && subjectIdx >= 2;
+            const locked = !profile?.is_premium && subjectIdx >= 3;
             return (
               <PeriodCard
                 key={p.id}
@@ -219,7 +219,7 @@ export default function Timetable() {
                 locked={locked}
                 onMark={(st) => {
                   if (locked) {
-                    toast.error("Free plan: only 2 subjects. Upgrade to Pro to unlock all.");
+                    toast.error("Free plan: only 3 subjects. Upgrade to Pro to unlock all.");
                     nav("/app/premium");
                     return;
                   }
@@ -232,7 +232,7 @@ export default function Timetable() {
 
           {fallback.map((s) => {
             const subjectIdx = visibleSubjects.findIndex((x) => x.id === s.id);
-            const locked = !profile?.is_premium && subjectIdx >= 2;
+            const locked = !profile?.is_premium && subjectIdx >= 3;
             return (
               <PeriodCard
                 key={s.id}
@@ -243,7 +243,7 @@ export default function Timetable() {
                 locked={locked}
                 onMark={(st) => {
                   if (locked) {
-                    toast.error("Free plan: only 2 subjects. Upgrade to Pro to unlock all.");
+                    toast.error("Free plan: only 3 subjects. Upgrade to Pro to unlock all.");
                     nav("/app/premium");
                     return;
                   }
