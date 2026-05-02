@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useDeleteSubject, useMarkAttendance, useSubjects, useProfile, type Subject } from "@/lib/data";
+import { Link } from "react-router-dom";
+import { useDeleteSubject, useMarkAttendance, useSubjects, type Subject } from "@/lib/data";
 import { healthStatus, percent, safeBunks } from "@/lib/attendance";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,25 +9,11 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger,
 } from "@/components/ui/drawer";
 
-const FREE_SUBJECT_LIMIT = 3;
-
 export default function Subjects() {
-  const nav = useNavigate();
   const { data: subjects = [], isLoading } = useSubjects();
-  const { data: profile } = useProfile();
   const mark = useMarkAttendance();
   const del = useDeleteSubject();
   const [, setActive] = useState<Subject | null>(null);
-  const isPremium = !!profile?.is_premium;
-  const atLimit = !isPremium && subjects.length >= FREE_SUBJECT_LIMIT;
-
-  const handleAdd = (e: React.MouseEvent) => {
-    if (atLimit) {
-      e.preventDefault();
-      toast.error(`Free plan: ${FREE_SUBJECT_LIMIT} subjects only. Upgrade to Pro for unlimited.`);
-      nav("/app/premium");
-    }
-  };
 
   // overall
   const totalHeld = subjects.reduce((a, s) => a + s.classes_held, 0);
@@ -89,8 +75,7 @@ export default function Subjects() {
 
       {/* Subject cards */}
       <div className="space-y-5">
-        {subjects.map((s, idx) => {
-          const locked = !isPremium && idx >= FREE_SUBJECT_LIMIT;
+        {subjects.map((s) => {
           const p = percent(s.classes_attended, s.classes_held);
           const req = Number(s.required_attendance);
           const st = healthStatus(p, req);
@@ -99,22 +84,11 @@ export default function Subjects() {
 
           return (
             <Drawer key={s.id} onOpenChange={(o) => {
-              if (o && locked) {
-                toast.error("Free plan: only 3 subjects. Upgrade to Pro to unlock all.");
-                nav("/app/premium");
-                return;
-              }
               if (o) setActive(s);
             }}>
               <DrawerTrigger asChild>
-                <button className={cn("w-full text-left tap-scale", locked && "opacity-60")}>
+                <button className="w-full text-left tap-scale">
                   <div className="bg-card rounded-xl p-6 shadow-card relative">
-                    {locked && (
-                      <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full bg-primary/15 text-primary text-[10px] font-bold">
-                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>lock</span>
-                        PRO
-                      </div>
-                    )}
                     <div className="flex justify-between items-start mb-4 gap-3">
                       <div className="min-w-0">
                         <h3 className="font-headline font-bold text-xl text-foreground leading-tight truncate">{s.name}</h3>
@@ -188,19 +162,11 @@ export default function Subjects() {
       </div>
 
       {/* FAB */}
-      <Link to="/app/subjects/new" onClick={handleAdd} className="fixed bottom-28 right-6 z-40">
+      <Link to="/app/subjects/new" className="fixed bottom-28 right-6 z-40">
         <button className="w-16 h-16 gradient-primary text-white rounded-full grid place-items-center shadow-glow tap-scale">
-          <span className="material-symbols-outlined" style={{ fontSize: 30 }}>{atLimit ? "lock" : "add"}</span>
+          <span className="material-symbols-outlined" style={{ fontSize: 30 }}>add</span>
         </button>
       </Link>
-
-      {atLimit && (
-        <div className="fixed bottom-28 left-5 right-24 z-30 surface-low rounded-xl px-3 py-2 shadow-soft">
-          <p className="text-[11px] font-bold text-muted-foreground">
-            Free limit reached · <Link to="/app/premium" className="text-primary">Upgrade</Link> for unlimited
-          </p>
-        </div>
-      )}
     </main>
   );
 }
