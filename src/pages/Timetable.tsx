@@ -207,8 +207,6 @@ export default function Timetable() {
           {todayPeriods.map((p) => {
             const subject = subjectsById.get(p.subject_id);
             if (!subject) return null;
-            const subjectIdx = visibleSubjects.findIndex((s) => s.id === subject.id);
-            const locked = !profile?.is_premium && subjectIdx >= 3;
             return (
               <PeriodCard
                 key={p.id}
@@ -216,13 +214,7 @@ export default function Timetable() {
                 start={p.start_time}
                 end={p.end_time}
                 room={p.room}
-                locked={locked}
                 onMark={(st) => {
-                  if (locked) {
-                    toast.error("Free plan: only 3 subjects. Upgrade to Pro to unlock all.");
-                    nav("/app/premium");
-                    return;
-                  }
                   mark.mutate({ subject, status: st });
                   toast.success(`${subject.name}: ${st}`);
                 }}
@@ -231,8 +223,6 @@ export default function Timetable() {
           })}
 
           {fallback.map((s) => {
-            const subjectIdx = visibleSubjects.findIndex((x) => x.id === s.id);
-            const locked = !profile?.is_premium && subjectIdx >= 3;
             return (
               <PeriodCard
                 key={s.id}
@@ -240,13 +230,7 @@ export default function Timetable() {
                 start={null}
                 end={null}
                 room={null}
-                locked={locked}
                 onMark={(st) => {
-                  if (locked) {
-                    toast.error("Free plan: only 3 subjects. Upgrade to Pro to unlock all.");
-                    nav("/app/premium");
-                    return;
-                  }
                   mark.mutate({ subject: s, status: st });
                   toast.success(`${s.name}: ${st}`);
                 }}
@@ -260,20 +244,19 @@ export default function Timetable() {
 }
 
 function PeriodCard({
-  subject, start, end, room, onMark, locked = false,
+  subject, start, end, room, onMark,
 }: {
   subject: Subject;
   start: string | null;
   end: string | null;
   room: string | null;
   onMark: (s: "present" | "absent" | "cancelled") => void;
-  locked?: boolean;
 }) {
   const p = percent(subject.classes_attended, subject.classes_held);
   const st = healthStatus(p, Number(subject.required_attendance));
 
   return (
-    <div className={cn("bg-card rounded-2xl p-5 shadow-card space-y-4 relative", locked && "opacity-60")}>
+    <div className="bg-card rounded-2xl p-5 shadow-card space-y-4 relative">
       {locked && (
         <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full bg-primary/15 text-primary text-[10px] font-bold">
           <span className="material-symbols-outlined" style={{ fontSize: 12 }}>lock</span>
