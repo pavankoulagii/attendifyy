@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useDeleteSubject, useMarkAttendance, useSubjects, useProfile, type Subject } from "@/lib/data";
+import { useDeleteSubject, useMarkAttendance, useSubjects, type Subject } from "@/lib/data";
 import { healthStatus, percent, safeBunks } from "@/lib/attendance";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -12,12 +12,9 @@ import {
 export default function Subjects() {
   const nav = useNavigate();
   const { data: subjects = [], isLoading } = useSubjects();
-  const { data: profile } = useProfile();
   const mark = useMarkAttendance();
   const del = useDeleteSubject();
   const [, setActive] = useState<Subject | null>(null);
-  // All subjects are accessible to every user — free or premium.
-  const isPremium = !!profile?.is_premium;
 
   // overall
   const totalHeld = subjects.reduce((a, s) => a + s.classes_held, 0);
