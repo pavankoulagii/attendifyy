@@ -83,14 +83,6 @@ export function useImportTimetable() {
     mutationFn: async ({ subjects, replace = false, validityDays = 7 }: { subjects: ExtractedSubject[]; replace?: boolean; validityDays?: number }) => {
       if (!user) throw new Error("not authed");
 
-      // Replace mode: wipe old timetable first so the new week starts clean
-      if (replace) {
-        const { error: pErr } = await supabase.from("class_periods").delete().eq("user_id", user.id);
-        if (pErr) throw pErr;
-        const { error: sErr } = await supabase.from("subjects").delete().eq("user_id", user.id);
-        if (sErr) throw sErr;
-      }
-
       // Stamp upload timestamp + AI-detected validity (in days) for auto-expiry
       await supabase
         .from("profiles")
@@ -100,26 +92,65 @@ export function useImportTimetable() {
         } as any)
         .eq("user_id", user.id);
 
+      // Load existing subjects so we can MERGE by name (case-insensitive).
+      // Replace mode = swap the schedule but KEEP attendance counters & logs.
+      const { data: existing, error: exErr } = await supabase
+        .from("subjects")
+        .select("id, name")
+        .eq("user_id", user.id);
+      if (exErr) throw exErr;
+
+      const norm = (s: string) => s.trim().toLowerCase();
+      const byName = new Map<string, string>();
+      (existing ?? []).forEach((s: any) => byName.set(norm(s.name), s.id));
+
+      const matchedIds = new Set<string>();
+
       for (let i = 0; i < subjects.length; i++) {
         const s = subjects[i];
         const days = Array.from(new Set(s.periods.map((p) => p.day_of_week)));
-        const { data: subj, error: sErr } = await supabase
-          .from("subjects")
-          .insert({
-            user_id: user.id,
-            name: s.name,
-            faculty: s.faculty || null,
-            color: COLORS[i % COLORS.length],
-            weekly_schedule: days as any,
-          })
-          .select("id")
-          .single();
-        if (sErr) throw sErr;
+        const existingId = byName.get(norm(s.name));
+
+        let subjectId: string;
+        if (existingId) {
+          // Merge: update schedule/faculty but keep classes_held & classes_attended
+          subjectId = existingId;
+          matchedIds.add(existingId);
+          const { error: uErr } = await supabase
+            .from("subjects")
+            .update({
+              faculty: s.faculty || null,
+              weekly_schedule: days as any,
+            })
+            .eq("id", existingId);
+          if (uErr) throw uErr;
+        } else {
+          const { data: subj, error: sErr } = await supabase
+            .from("subjects")
+            .insert({
+              user_id: user.id,
+              name: s.name,
+              faculty: s.faculty || null,
+              color: COLORS[i % COLORS.length],
+              weekly_schedule: days as any,
+            })
+            .select("id")
+            .single();
+          if (sErr) throw sErr;
+          subjectId = subj.id;
+        }
+
+        // Replace this subject's periods with the new schedule
+        const { error: dPErr } = await supabase
+          .from("class_periods")
+          .delete()
+          .eq("subject_id", subjectId);
+        if (dPErr) throw dPErr;
 
         if (s.periods.length > 0) {
           const rows = s.periods.map((p) => ({
             user_id: user.id,
-            subject_id: subj.id,
+            subject_id: subjectId,
             day_of_week: p.day_of_week,
             start_time: normalizeTime(p.start_time),
             end_time: normalizeTime(p.end_time),
@@ -127,6 +158,19 @@ export function useImportTimetable() {
           }));
           const { error: pErr } = await supabase.from("class_periods").insert(rows);
           if (pErr) throw pErr;
+        }
+      }
+
+      // In replace mode: drop old subjects that aren't in the new timetable.
+      // Their attendance_logs will cascade-delete. Subjects that match by
+      // name keep their counters & logs intact.
+      if (replace) {
+        const stale = (existing ?? [])
+          .filter((s: any) => !matchedIds.has(s.id))
+          .map((s: any) => s.id);
+        if (stale.length > 0) {
+          const { error: sdErr } = await supabase.from("subjects").delete().in("id", stale);
+          if (sdErr) throw sdErr;
         }
       }
     },
