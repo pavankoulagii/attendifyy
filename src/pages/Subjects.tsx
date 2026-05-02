@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useDeleteSubject, useMarkAttendance, useSubjects, type Subject } from "@/lib/data";
 import { healthStatus, percent, safeBunks } from "@/lib/attendance";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/drawer";
 
 export default function Subjects() {
-  const nav = useNavigate();
   const { data: subjects = [], isLoading } = useSubjects();
   const mark = useMarkAttendance();
   const del = useDeleteSubject();
