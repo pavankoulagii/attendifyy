@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useAttendanceLogs, useSubjects } from "@/lib/data";
+import { useAttendanceLogs, useSubjects, useProfile } from "@/lib/data";
 import { percent } from "@/lib/attendance";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, Line, LineChart, YAxis, CartesianGrid } from "recharts";
 import { format, subDays, parseISO, startOfDay, isSameDay } from "date-fns";
@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 export default function Analytics() {
   const { data: subjects = [] } = useSubjects();
   const { data: logs = [] } = useAttendanceLogs();
+  const { data: profile } = useProfile();
+  const required = Number(profile?.required_attendance ?? 75);
 
   const subjectData = subjects.map((s) => ({
     name: s.name.length > 8 ? s.name.slice(0, 8) + "…" : s.name,
@@ -26,17 +28,56 @@ export default function Analytics() {
     });
   }, [logs]);
 
-  const streak = useMemo(() => {
-    let s = 0;
-    for (let i = 0; i < 60; i++) {
+  // Streak = consecutive days (working backward from today) where the
+  // running overall % across ALL subjects stayed at or above the required
+  // attendance threshold. Days with no marked classes are skipped (don't
+  // break the streak, don't extend it).
+  const { streak, bestStreak } = useMemo(() => {
+    // Sort logs ascending so we can replay them day by day.
+    const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
+    // Group by date string
+    const byDate = new Map<string, typeof logs>();
+    sorted.forEach((l) => {
+      const k = l.date;
+      if (!byDate.has(k)) byDate.set(k, [] as any);
+      (byDate.get(k) as any).push(l);
+    });
+    // Replay running totals to compute overall % at the end of each day
+    let attended = 0, held = 0;
+    const dayPct = new Map<string, number>();
+    Array.from(byDate.keys()).sort().forEach((date) => {
+      const dl = byDate.get(date)!;
+      dl.forEach((l) => {
+        if (l.status === "cancelled") return;
+        held += 1;
+        if (l.status === "present") attended += 1;
+      });
+      dayPct.set(date, held === 0 ? 0 : (attended / held) * 100);
+    });
+    // Best streak across history
+    let best = 0, run = 0;
+    Array.from(dayPct.values()).forEach((p) => {
+      if (p >= required) { run += 1; best = Math.max(best, run); }
+      else run = 0;
+    });
+    // Current streak: walk back from today, skip days with no classes,
+    // stop on the first day whose end-of-day % fell below required.
+    let cur = 0;
+    for (let i = 0; i < 365; i++) {
       const d = startOfDay(subDays(new Date(), i));
-      const dayLogs = logs.filter((l) => isSameDay(parseISO(l.date), d));
-      if (dayLogs.length === 0) break;
-      const allPresent = dayLogs.every((l) => l.status !== "absent");
-      if (allPresent) s++; else break;
+      const key = format(d, "yyyy-MM-dd");
+      if (!dayPct.has(key)) {
+        // No classes that day. If we haven't started counting yet keep
+        // walking back to find the most recent active day.
+        if (cur === 0) continue;
+        // Once a streak has begun, gaps don't break it either.
+        continue;
+      }
+      if (dayPct.get(key)! >= required) cur += 1;
+      else break;
     }
-    return s;
-  }, [logs]);
+    return { streak: cur, bestStreak: best };
+  }, [logs, required]);
 
   const best = [...subjects].sort((a, b) => percent(b.classes_attended, b.classes_held) - percent(a.classes_attended, a.classes_held))[0];
   const worst = [...subjects].sort((a, b) => percent(a.classes_attended, a.classes_held) - percent(b.classes_attended, b.classes_held))[0];
@@ -51,8 +92,8 @@ export default function Analytics() {
 
       {/* Stat tiles */}
       <section className="grid grid-cols-2 gap-3">
-        <Stat icon="local_fire_department" tone="accent" label="Current Streak" value={`${streak}d`} />
-        <Stat icon="menu_book" tone="primary" label="Subjects" value={subjects.length} />
+        <Stat icon="local_fire_department" tone="accent" label={`Streak ≥ ${required}%`} value={`${streak}d`} />
+        <Stat icon="trophy" tone="primary" label="Best Streak" value={`${bestStreak}d`} />
         <Stat icon="emoji_events" tone="secondary" label="Best" value={best ? best.name : "—"} small />
         <Stat icon="warning" tone="danger" label="Most missed" value={worst ? worst.name : "—"} small />
       </section>
