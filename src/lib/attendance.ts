@@ -8,8 +8,10 @@ export interface SubjectStats {
   required: number; // percentage e.g. 75
 }
 
+// Attendance % — 0 when no classes have been held yet (fresh start),
+// so a brand-new student doesn't see a misleading "100%".
 export const percent = (attended: number, held: number) =>
-  held === 0 ? 100 : (attended / held) * 100;
+  held === 0 ? 0 : (attended / held) * 100;
 
 /**
  * Maximum consecutive classes the student can SKIP starting now
