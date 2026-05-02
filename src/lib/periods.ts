@@ -193,13 +193,11 @@ export function useClearTimetable() {
   return useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("not authed");
-      // Wipe attendance history first so the calendar is clean for the new week
-      const { error: aErr } = await supabase.from("attendance_logs").delete().eq("user_id", user.id);
-      if (aErr) throw aErr;
+      // Keep subjects + attendance_logs intact so the next uploaded
+      // timetable can continue counters by merging on subject name.
+      // Only the active schedule (periods + upload stamp) is cleared.
       const { error: pErr } = await supabase.from("class_periods").delete().eq("user_id", user.id);
       if (pErr) throw pErr;
-      const { error: sErr } = await supabase.from("subjects").delete().eq("user_id", user.id);
-      if (sErr) throw sErr;
       const { error: upErr } = await supabase
         .from("profiles")
         .update({ timetable_uploaded_at: null } as any)
