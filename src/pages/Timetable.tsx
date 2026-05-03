@@ -251,16 +251,45 @@ export default function Timetable() {
 }
 
 function PeriodCard({
-  subject, start, end, room, onMark,
+  subject, start, end, room, onMark, locked, onLockedClick,
 }: {
   subject: Subject;
   start: string | null;
   end: string | null;
   room: string | null;
   onMark: (s: "present" | "absent" | "cancelled") => void;
+  locked?: boolean;
+  onLockedClick?: () => void;
 }) {
   const p = percent(subject.classes_attended, subject.classes_held);
   const st = healthStatus(p, Number(subject.required_attendance));
+
+  if (locked) {
+    return (
+      <button
+        onClick={onLockedClick}
+        className="w-full text-left tap-scale"
+      >
+        <div className="bg-card rounded-2xl p-5 shadow-card relative overflow-hidden">
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 grid place-items-center">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined ms-fill text-primary" style={{ fontSize: 24 }}>lock</span>
+              <span className="text-xs font-headline font-black uppercase tracking-widest gradient-primary bg-clip-text text-transparent">Unlock with Pro</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 opacity-50">
+            <div className="h-12 w-12 rounded-2xl shrink-0" style={{ background: subject.color }} />
+            <div className="flex-1 min-w-0">
+              <p className="font-headline font-bold text-base truncate">{subject.name}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {start && end ? `${fmtTime(start)} – ${fmtTime(end)}` : (subject.faculty || "—")}
+              </p>
+            </div>
+          </div>
+        </div>
+      </button>
+    );
+  }
 
   return (
     <div className="bg-card rounded-2xl p-5 shadow-card space-y-4 relative">
