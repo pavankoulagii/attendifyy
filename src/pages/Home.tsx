@@ -5,6 +5,7 @@ import { useProfile, useSubjects } from "@/lib/data";
 import { healthStatus, percent, safeBunks } from "@/lib/attendance";
 import { accessibleSubjects } from "@/lib/freeTier";
 import { Button } from "@/components/ui/button";
+import FreeTierBanner from "@/components/FreeTierBanner";
 import { cn } from "@/lib/utils";
 
 const motivation = [
@@ -101,6 +102,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <FreeTierBanner />
 
       {/* Action buttons */}
       <section className="grid grid-cols-1 gap-3">

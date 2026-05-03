@@ -8,10 +8,17 @@ export function isPremium(profile: any): boolean {
   return !!profile?.is_premium;
 }
 
-/** Subjects accessible/counted on the free tier (or all if premium). */
+/**
+ * Subjects accessible/counted on the free tier (or all if premium).
+ *
+ * Stability contract: ordering uses `created_at ASC`, which is set ONCE at
+ * row insert and is never modified by timetable re-uploads or edits
+ * (`useImportTimetable` merges by name and only patches schedule/faculty —
+ * see src/lib/periods.ts). This guarantees the same first 3 subjects stay
+ * unlocked even after the user re-uploads or tweaks their timetable.
+ */
 export function accessibleSubjects(subjects: Subject[], profile: any): Subject[] {
   if (isPremium(profile)) return subjects;
-  // Sort by created_at ascending so "first 3" is stable
   const sorted = [...subjects].sort((a, b) =>
     (a.created_at ?? "").localeCompare(b.created_at ?? "")
   );
