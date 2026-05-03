@@ -208,6 +208,7 @@ export default function Timetable() {
           {todayPeriods.map((p) => {
             const subject = subjectsById.get(p.subject_id);
             if (!subject) return null;
+            const locked = isSubjectLocked(subject, visibleSubjects, profile);
             return (
               <PeriodCard
                 key={p.id}
@@ -215,6 +216,8 @@ export default function Timetable() {
                 start={p.start_time}
                 end={p.end_time}
                 room={p.room}
+                locked={locked}
+                onLockedClick={() => nav("/app/premium")}
                 onMark={(st) => {
                   mark.mutate({ subject, status: st });
                   toast.success(`${subject.name}: ${st}`);
@@ -224,6 +227,7 @@ export default function Timetable() {
           })}
 
           {fallback.map((s) => {
+            const locked = isSubjectLocked(s, visibleSubjects, profile);
             return (
               <PeriodCard
                 key={s.id}
@@ -231,6 +235,8 @@ export default function Timetable() {
                 start={null}
                 end={null}
                 room={null}
+                locked={locked}
+                onLockedClick={() => nav("/app/premium")}
                 onMark={(st) => {
                   mark.mutate({ subject: s, status: st });
                   toast.success(`${s.name}: ${st}`);
