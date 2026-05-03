@@ -22,12 +22,13 @@ export default function Home() {
   const nav = useNavigate();
 
   const stats = useMemo(() => {
-    const totalHeld = subjects.reduce((a, s) => a + s.classes_held, 0);
-    const totalAtt = subjects.reduce((a, s) => a + s.classes_attended, 0);
+    const counted = accessibleSubjects(subjects, profile);
+    const totalHeld = counted.reduce((a, s) => a + s.classes_held, 0);
+    const totalAtt = counted.reduce((a, s) => a + s.classes_attended, 0);
     const overall = percent(totalAtt, totalHeld);
     const required = profile?.required_attendance ?? 75;
     let risk = 0, totalSafeBunks = 0;
-    subjects.forEach((s) => {
+    counted.forEach((s) => {
       const p = percent(s.classes_attended, s.classes_held);
       const st = healthStatus(p, Number(s.required_attendance));
       if (st === "critical") risk++;
