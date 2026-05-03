@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useDeleteSubject, useMarkAttendance, useSubjects, type Subject } from "@/lib/data";
+import { Link, useNavigate } from "react-router-dom";
+import { useDeleteSubject, useMarkAttendance, useSubjects, useProfile, type Subject } from "@/lib/data";
 import { healthStatus, percent, safeBunks } from "@/lib/attendance";
+import { accessibleSubjects, isSubjectLocked, isPremium, FREE_SUBJECT_LIMIT } from "@/lib/freeTier";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -11,13 +12,18 @@ import {
 
 export default function Subjects() {
   const { data: subjects = [], isLoading } = useSubjects();
+  const { data: profile } = useProfile();
   const mark = useMarkAttendance();
   const del = useDeleteSubject();
+  const nav = useNavigate();
   const [, setActive] = useState<Subject | null>(null);
 
-  // overall
-  const totalHeld = subjects.reduce((a, s) => a + s.classes_held, 0);
-  const totalAtt = subjects.reduce((a, s) => a + s.classes_attended, 0);
+  const premium = isPremium(profile);
+  const counted = accessibleSubjects(subjects, profile);
+
+  // overall — only counts accessible subjects on free tier
+  const totalHeld = counted.reduce((a, s) => a + s.classes_held, 0);
+  const totalAtt = counted.reduce((a, s) => a + s.classes_attended, 0);
   const overall = totalHeld === 0 ? 0 : (totalAtt / totalHeld) * 100;
   const r = 26, C = 2 * Math.PI * r;
   const offset = C * (1 - Math.min(100, overall) / 100);
