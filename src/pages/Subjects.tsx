@@ -36,6 +36,9 @@ export default function Subjects() {
           <h2 className="font-headline font-extrabold text-3xl tracking-tight">Your Courses</h2>
           <p className="text-muted-foreground text-sm font-medium">
             Tracking {subjects.length} active subject{subjects.length === 1 ? "" : "s"} this semester
+            {!premium && subjects.length > FREE_SUBJECT_LIMIT && (
+              <> · <span className="text-primary font-bold">{FREE_SUBJECT_LIMIT} free, {subjects.length - FREE_SUBJECT_LIMIT} locked</span></>
+            )}
           </p>
         </div>
 
