@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMarkAttendance, useSubjects, useProfile, type Subject } from "@/lib/data";
 import { useClassPeriods, useClearTimetable, ttlMsFromDays, fmtTime } from "@/lib/periods";
+import { isSubjectLocked } from "@/lib/freeTier";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { percent, healthStatus } from "@/lib/attendance";
