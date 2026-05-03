@@ -1,15 +1,20 @@
 import { useMemo } from "react";
 import { useAttendanceLogs, useSubjects, useProfile } from "@/lib/data";
 import { percent } from "@/lib/attendance";
+import { accessibleSubjects } from "@/lib/freeTier";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, Line, LineChart, YAxis, CartesianGrid } from "recharts";
 import { format, subDays, parseISO, startOfDay, isSameDay } from "date-fns";
 import { cn } from "@/lib/utils";
 
 export default function Analytics() {
-  const { data: subjects = [] } = useSubjects();
-  const { data: logs = [] } = useAttendanceLogs();
+  const { data: allSubjects = [] } = useSubjects();
+  const { data: logs: allLogs = [] } = useAttendanceLogs();
   const { data: profile } = useProfile();
   const required = Number(profile?.required_attendance ?? 75);
+
+  const subjects = accessibleSubjects(allSubjects, profile);
+  const accessibleIds = new Set(subjects.map((s) => s.id));
+  const logs = allLogs.filter((l) => accessibleIds.has(l.subject_id));
 
   const subjectData = subjects.map((s) => ({
     name: s.name.length > 8 ? s.name.slice(0, 8) + "…" : s.name,
