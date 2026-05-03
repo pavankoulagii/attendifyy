@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMarkAttendance, useSubjects, useProfile, type Subject } from "@/lib/data";
 import { useClassPeriods, useClearTimetable, ttlMsFromDays, fmtTime } from "@/lib/periods";
+import { isSubjectLocked } from "@/lib/freeTier";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { percent, healthStatus } from "@/lib/attendance";
@@ -207,6 +208,7 @@ export default function Timetable() {
           {todayPeriods.map((p) => {
             const subject = subjectsById.get(p.subject_id);
             if (!subject) return null;
+            const locked = isSubjectLocked(subject, visibleSubjects, profile);
             return (
               <PeriodCard
                 key={p.id}
@@ -214,6 +216,8 @@ export default function Timetable() {
                 start={p.start_time}
                 end={p.end_time}
                 room={p.room}
+                locked={locked}
+                onLockedClick={() => nav("/app/premium")}
                 onMark={(st) => {
                   mark.mutate({ subject, status: st });
                   toast.success(`${subject.name}: ${st}`);
@@ -223,6 +227,7 @@ export default function Timetable() {
           })}
 
           {fallback.map((s) => {
+            const locked = isSubjectLocked(s, visibleSubjects, profile);
             return (
               <PeriodCard
                 key={s.id}
@@ -230,6 +235,8 @@ export default function Timetable() {
                 start={null}
                 end={null}
                 room={null}
+                locked={locked}
+                onLockedClick={() => nav("/app/premium")}
                 onMark={(st) => {
                   mark.mutate({ subject: s, status: st });
                   toast.success(`${s.name}: ${st}`);
@@ -244,16 +251,45 @@ export default function Timetable() {
 }
 
 function PeriodCard({
-  subject, start, end, room, onMark,
+  subject, start, end, room, onMark, locked, onLockedClick,
 }: {
   subject: Subject;
   start: string | null;
   end: string | null;
   room: string | null;
   onMark: (s: "present" | "absent" | "cancelled") => void;
+  locked?: boolean;
+  onLockedClick?: () => void;
 }) {
   const p = percent(subject.classes_attended, subject.classes_held);
   const st = healthStatus(p, Number(subject.required_attendance));
+
+  if (locked) {
+    return (
+      <button
+        onClick={onLockedClick}
+        className="w-full text-left tap-scale"
+      >
+        <div className="bg-card rounded-2xl p-5 shadow-card relative overflow-hidden">
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 grid place-items-center">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined ms-fill text-primary" style={{ fontSize: 24 }}>lock</span>
+              <span className="text-xs font-headline font-black uppercase tracking-widest gradient-primary bg-clip-text text-transparent">Unlock with Pro</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 opacity-50">
+            <div className="h-12 w-12 rounded-2xl shrink-0" style={{ background: subject.color }} />
+            <div className="flex-1 min-w-0">
+              <p className="font-headline font-bold text-base truncate">{subject.name}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {start && end ? `${fmtTime(start)} – ${fmtTime(end)}` : (subject.faculty || "—")}
+              </p>
+            </div>
+          </div>
+        </div>
+      </button>
+    );
+  }
 
   return (
     <div className="bg-card rounded-2xl p-5 shadow-card space-y-4 relative">

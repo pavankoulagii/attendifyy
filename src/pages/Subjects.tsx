@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useDeleteSubject, useMarkAttendance, useSubjects, type Subject } from "@/lib/data";
+import { Link, useNavigate } from "react-router-dom";
+import { useDeleteSubject, useMarkAttendance, useSubjects, useProfile, type Subject } from "@/lib/data";
 import { healthStatus, percent, safeBunks } from "@/lib/attendance";
+import { accessibleSubjects, isSubjectLocked, isPremium, FREE_SUBJECT_LIMIT } from "@/lib/freeTier";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -11,13 +12,18 @@ import {
 
 export default function Subjects() {
   const { data: subjects = [], isLoading } = useSubjects();
+  const { data: profile } = useProfile();
   const mark = useMarkAttendance();
   const del = useDeleteSubject();
+  const nav = useNavigate();
   const [, setActive] = useState<Subject | null>(null);
 
-  // overall
-  const totalHeld = subjects.reduce((a, s) => a + s.classes_held, 0);
-  const totalAtt = subjects.reduce((a, s) => a + s.classes_attended, 0);
+  const premium = isPremium(profile);
+  const counted = accessibleSubjects(subjects, profile);
+
+  // overall — only counts accessible subjects on free tier
+  const totalHeld = counted.reduce((a, s) => a + s.classes_held, 0);
+  const totalAtt = counted.reduce((a, s) => a + s.classes_attended, 0);
   const overall = totalHeld === 0 ? 0 : (totalAtt / totalHeld) * 100;
   const r = 26, C = 2 * Math.PI * r;
   const offset = C * (1 - Math.min(100, overall) / 100);
@@ -30,6 +36,9 @@ export default function Subjects() {
           <h2 className="font-headline font-extrabold text-3xl tracking-tight">Your Courses</h2>
           <p className="text-muted-foreground text-sm font-medium">
             Tracking {subjects.length} active subject{subjects.length === 1 ? "" : "s"} this semester
+            {!premium && subjects.length > FREE_SUBJECT_LIMIT && (
+              <> · <span className="text-primary font-bold">{FREE_SUBJECT_LIMIT} free, {subjects.length - FREE_SUBJECT_LIMIT} locked</span></>
+            )}
           </p>
         </div>
 
@@ -81,6 +90,36 @@ export default function Subjects() {
           const st = healthStatus(p, req);
           const sb = safeBunks({ attended: s.classes_attended, held: s.classes_held, required: req });
           const recover = needToRecover(s);
+          const locked = isSubjectLocked(s, subjects, profile);
+
+          if (locked) {
+            return (
+              <button
+                key={s.id}
+                onClick={() => nav("/app/premium")}
+                className="w-full text-left tap-scale"
+              >
+                <div className="bg-card rounded-xl p-6 shadow-card relative overflow-hidden">
+                  <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 grid place-items-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="material-symbols-outlined ms-fill text-primary" style={{ fontSize: 36 }}>lock</span>
+                      <span className="text-xs font-headline font-black uppercase tracking-widest gradient-primary bg-clip-text text-transparent">Unlock with Pro</span>
+                      <span className="text-[10px] font-bold text-muted-foreground">Tap to upgrade · ₹149/yr</span>
+                    </div>
+                  </div>
+                  <div className="opacity-50">
+                    <div className="flex justify-between items-start mb-4 gap-3">
+                      <div className="min-w-0">
+                        <h3 className="font-headline font-bold text-xl truncate">{s.name}</h3>
+                        <p className="text-sm text-muted-foreground font-medium truncate">{s.faculty || "—"}</p>
+                      </div>
+                    </div>
+                    <div className="w-full h-3 bg-surface-mid rounded-full mb-4" />
+                  </div>
+                </div>
+              </button>
+            );
+          }
 
           return (
             <Drawer key={s.id} onOpenChange={(o) => {
