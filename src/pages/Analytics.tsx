@@ -5,6 +5,7 @@ import { accessibleSubjects } from "@/lib/freeTier";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, Line, LineChart, YAxis, CartesianGrid } from "recharts";
 import { format, subDays, parseISO, startOfDay, isSameDay } from "date-fns";
 import { cn } from "@/lib/utils";
+import FreeTierBanner from "@/components/FreeTierBanner";
 
 export default function Analytics() {
   const { data: allSubjects = [] } = useSubjects();
@@ -94,6 +95,8 @@ export default function Analytics() {
         <h1 className="font-headline font-extrabold text-3xl tracking-tight">Analytics</h1>
         <p className="text-muted-foreground text-sm font-medium mt-1">Your attendance, visualized beautifully</p>
       </header>
+
+      <FreeTierBanner />
 
       {/* Stat tiles */}
       <section className="grid grid-cols-2 gap-3">
