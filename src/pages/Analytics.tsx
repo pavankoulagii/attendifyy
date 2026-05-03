@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 export default function Analytics() {
   const { data: allSubjects = [] } = useSubjects();
-  const { data: logs: allLogs = [] } = useAttendanceLogs();
+  const { data: allLogs = [] } = useAttendanceLogs();
   const { data: profile } = useProfile();
   const required = Number(profile?.required_attendance ?? 75);
 
