@@ -33,7 +33,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/welcome" element={<Onboarding />} />
+              <Route path="/welcome" element={<Navigate to="/auth" replace />} />
               <Route path="/auth" element={<Auth />} />
 
               <Route path="/app" element={<RequireAuth><AppShell /></RequireAuth>}>
