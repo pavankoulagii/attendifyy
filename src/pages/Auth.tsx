@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,24 @@ export default function Auth() {
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Catch OAuth provider errors returned in the URL (e.g. ?error=... or #error=...)
+  useEffect(() => {
+    const parse = (s: string) => new URLSearchParams(s.startsWith("#") ? s.slice(1) : s);
+    const fromHash = parse(window.location.hash || "");
+    const fromQuery = parse(window.location.search || "");
+    const err =
+      fromHash.get("error_description") ||
+      fromHash.get("error") ||
+      fromQuery.get("error_description") ||
+      fromQuery.get("error");
+    if (err) {
+      toast.error(`Google sign-in failed: ${decodeURIComponent(err).replace(/\+/g, " ")}`);
+      // Clean URL so the error doesn't persist on refresh
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,15 +68,29 @@ export default function Auth() {
 
   const google = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      setGoogleLoading(true);
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/app`,
         },
       });
       if (error) throw error;
+      if (!data?.url) {
+        throw new Error("Google provider didn't return a redirect URL. Please try again.");
+      }
+      // If the browser hasn't navigated within 6s, the redirect likely failed (popup blocked,
+      // network issue, or provider misconfig). Surface a clear message instead of a stuck button.
+      setTimeout(() => {
+        if (document.visibilityState === "visible") {
+          setGoogleLoading(false);
+          toast.error("Provider redirect didn't start. Check your connection or try email sign-in.");
+        }
+      }, 6000);
     } catch (err: any) {
-      toast.error(err.message ?? "Google sign-in failed");
+      setGoogleLoading(false);
+      const msg = err?.message ?? "Google sign-in failed";
+      toast.error(`${msg}. Please try again or use email sign-in.`);
     }
   };
 
@@ -232,6 +264,7 @@ export default function Auth() {
             <Button
               type="button"
               onClick={google}
+              disabled={googleLoading}
               variant="ghost"
               className="w-full h-12 rounded-2xl bg-card hover:bg-surface-low text-foreground tap-scale font-headline font-bold shadow-soft border-0"
             >
@@ -241,7 +274,7 @@ export default function Auth() {
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/>
               </svg>
-              Continue with Google
+              {googleLoading ? "Connecting to Google…" : "Continue with Google"}
             </Button>
           </>
         )}
