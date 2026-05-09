@@ -67,26 +67,101 @@ export default function Auth() {
     }
   };
 
+  const friendlyOAuthError = (err: any): { title: string; description: string } => {
+    const raw = (err?.message || err?.error_description || err?.error || String(err || "")).toLowerCase();
+
+    if (!navigator.onLine || raw.includes("network") || raw.includes("fetch") || raw.includes("failed to fetch")) {
+      return {
+        title: "No internet connection",
+        description: "Check your network and try again. If you're on Wi-Fi, try switching to mobile data.",
+      };
+    }
+    if (raw.includes("popup") && (raw.includes("block") || raw.includes("closed"))) {
+      return {
+        title: "Popup blocked",
+        description: "Allow popups for this site in your browser settings, then tap Continue with Google again.",
+      };
+    }
+    if (raw.includes("popup_closed") || raw.includes("user closed") || raw.includes("cancel")) {
+      return {
+        title: "Sign-in cancelled",
+        description: "You closed the Google window before finishing. Tap Continue with Google to try again.",
+      };
+    }
+    if (raw.includes("redirect") || raw.includes("redirect_uri") || raw.includes("redirect_uri_mismatch")) {
+      return {
+        title: "Redirect misconfigured",
+        description: "Google rejected the redirect URL. Use email sign-in for now — we're notified to fix this.",
+      };
+    }
+    if (raw.includes("missing oauth secret") || raw.includes("unsupported provider") || raw.includes("provider is not enabled")) {
+      return {
+        title: "Google sign-in unavailable",
+        description: "Google login isn't fully configured yet. Please use email sign-in for now.",
+      };
+    }
+    if (raw.includes("access_denied") || raw.includes("consent")) {
+      return {
+        title: "Permission denied",
+        description: "You didn't grant access to your Google account. Try again and tap Allow on the consent screen.",
+      };
+    }
+    if (raw.includes("timeout") || raw.includes("timed out")) {
+      return {
+        title: "Google took too long",
+        description: "The connection to Google timed out. Check your network and try again.",
+      };
+    }
+    if (raw.includes("third-party") || raw.includes("third party") || raw.includes("cookie")) {
+      return {
+        title: "Third-party cookies blocked",
+        description: "Enable third-party cookies for this site, or try a different browser.",
+      };
+    }
+    return {
+      title: "Google sign-in failed",
+      description: err?.message ? err.message : "Something went wrong. Please try again or use email sign-in.",
+    };
+  };
+
   const google = async () => {
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
     try {
+      if (!navigator.onLine) {
+        toast.error("No internet connection", {
+          description: "Connect to the internet and try again.",
+        });
+        return;
+      }
       setGoogleLoading(true);
+
+      // Watchdog: if nothing happens within 8s, surface a helpful message
+      watchdog = setTimeout(() => {
+        toast.error("Google is taking too long", {
+          description: "If a popup didn't open, allow popups for this site or check your network, then try again.",
+        });
+        setGoogleLoading(false);
+      }, 8000);
+
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: `${window.location.origin}/app`,
       });
+
       if (result.error) {
         throw result.error;
       }
       if (result.redirected) {
-        // Browser will redirect to Google
+        // Browser will redirect to Google — keep loading state until navigation
         return;
       }
-      // Tokens received and session set — user is authenticated
+      clearTimeout(watchdog);
       toast.success("Welcome 👋");
       nav("/app");
     } catch (err: any) {
-      const msg = err?.message ?? "Google sign-in failed";
-      toast.error(`${msg}. Please try again or use email sign-in.`);
+      const { title, description } = friendlyOAuthError(err);
+      toast.error(title, { description });
     } finally {
+      if (watchdog) clearTimeout(watchdog);
       setGoogleLoading(false);
     }
   };
