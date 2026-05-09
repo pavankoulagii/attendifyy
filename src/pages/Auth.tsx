@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,28 +70,24 @@ export default function Auth() {
   const google = async () => {
     try {
       setGoogleLoading(true);
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/app`,
-        },
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: `${window.location.origin}/app`,
       });
-      if (error) throw error;
-      if (!data?.url) {
-        throw new Error("Google provider didn't return a redirect URL. Please try again.");
+      if (result.error) {
+        throw result.error;
       }
-      // If the browser hasn't navigated within 6s, the redirect likely failed (popup blocked,
-      // network issue, or provider misconfig). Surface a clear message instead of a stuck button.
-      setTimeout(() => {
-        if (document.visibilityState === "visible") {
-          setGoogleLoading(false);
-          toast.error("Provider redirect didn't start. Check your connection or try email sign-in.");
-        }
-      }, 6000);
+      if (result.redirected) {
+        // Browser will redirect to Google
+        return;
+      }
+      // Tokens received and session set — user is authenticated
+      toast.success("Welcome 👋");
+      nav("/app");
     } catch (err: any) {
-      setGoogleLoading(false);
       const msg = err?.message ?? "Google sign-in failed";
       toast.error(`${msg}. Please try again or use email sign-in.`);
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
